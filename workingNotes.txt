@@ -1,0 +1,3 @@
+create symbolic link to gestalt6 directory in /usr/bin/:
+sudo ln -s /Users/imoyer/Documents/Projects/086\ Gestalt/gestalt6 /Library/Python/2.7/site-packages/gestalt
+-> python path is different from system $PATH!!

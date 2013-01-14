@@ -1,0 +1,26 @@
+ GESTALT
+
+ A TOOL FOR BUILDING PERSONAL AUTOMATION TOOLS AND WORKFLOWS
+
+ ILAN E. MOYER
+ (c) MASSACHUSETTS INSTITUTE OF TECHNOLOGY 2013
+
+
+ REVISION HISTORY:
+-----------------------------------------------------------------------------------------------------
+| DATE			| FILENAME          	| MODIFICATIONS                         	|NAME      		|
+-----------------------------------------------------------------------------------------------------
+| 1/31/2012	| gestalt03.py			| CREATED                                	|ILAN E. MOYER     	| rewritten in this version
+-----------------------------------------------------------------------------------------------------
+| 4/16/2012	| gestalt04.py			| TAKE 2                                	|ILAN E. MOYER     	|
+-----------------------------------------------------------------------------------------------------
+| 7/29/2012	| gestalt05.py			| Taking the leap to gestalt hardware      	|ILAN E. MOYER     	|
+-----------------------------------------------------------------------------------------------------
+| 7/29/2012	| gestalt6				| Refactored for thesis, and for real.      |ILAN E. MOYER     	|
+-----------------------------------------------------------------------------------------------------
+
+
+The core of gestalt is the ability to generate and address physical nodes from python.
+
+nodes can be declared as follows:
+
