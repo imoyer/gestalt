@@ -7,7 +7,7 @@ import Queue
 from gestalt.utilities import notice as notice
 
 
-#----CLASSES------------
+#----INTERFACE CLASSES------------
 class interfaceShell(object):
 	'''Allows both the node and shell node to access the interface by acting as an intermediary.'''
 	def __init__(self, interface = None, owner = None):
@@ -162,23 +162,6 @@ class serialInterface(devInterface):
 			notice(self, 'no port name provided.')
 			return False
 			
-	def disconnect(self):
-		'''Disconnects from serial port.'''
-		self.port.close()
-		self.isConnected = False
-		
-	def setDTR(self):
-		'''Used to reset the Arduino hardware.'''
-		if self.serialPort:
-			self.serialPort.setDTR()
-		return	
-	
-	def startTransmitter(self):
-		'''Starts the transmit thread.'''
-		self.transmitter = self.transmitThread(self.transmitQueue, self.serialPort)
-		self.transmitter.daemon = True
-		self.transmitter.start()
-	
 	def connectToPort(self, portName):
 		'''Actually connects the interface to the port'''
 		try:
@@ -192,9 +175,122 @@ class serialInterface(devInterface):
 		except:
 			notice(self, "error opening serial port "+ str(portName))
 			return False
+
+	def disconnect(self):
+		'''Disconnects from serial port.'''
+		self.port.close()
+		self.isConnected = False
+		
+	def setDTR(self):
+		'''Used to reset the Arduino hardware.'''
+		if self.port:
+			self.port.setDTR()
+		return	
+	
+	def startTransmitter(self):
+		'''Starts the transmit thread.'''
+		self.transmitter = self.transmitThread(self.transmitQueue, self.port)
+		self.transmitter.daemon = True
+		self.transmitter.start()
+	
+	def transmit(self, data):
+		'''Sends request for data to be transmitted over the serial port. Format is as a list.'''
+		self.transmitQueue.put(data)	#converts to list in case data comes in as a string.
+		
+	class transmitThread(threading.Thread):
+		'''Handles transmitting data over the serial port.'''
+		def __init__(self, transmitQueue, port):
+			threading.Thread.__init__(self)	#initialize threading superclass
+			self.transmitQueue = transmitQueue
+			self.port = port
+		
+		def run(self):
+			'''Code run by the transmit thread.'''
+			while true:
+				transmitState, transmitPacket = self.getTransmitPacket()
+				if transmitState:
+					if self.port:
+						self.port.write(serialize(transmitPacket))
+					else: notice(self, 'Cannot Transmit - No Serial Port Initialized')
+				time.sleep(0.0005)
+
+		def getTransmitPacket(self):
+			'''Tries to fetch a packet from the transmit queue.'''
+			try:
+				return True, self.transmitQueue.get()
+			except:
+				return False, None
+
+		def receive(self):
+			'''Grabs one byte from the serial port with no timeout.'''
+			if self.port: return self.port.read()
+			else: return None
+		
 		
 class gestaltInterface(baseInterface):
 	'''Interface to Gestalt nodes based on the Gestalt protocol.'''
-	def __init__(self, interface = None):
-		pass
+	def __init__(self, name = None, interface = None):
+		self.interface = interfaceShell(interface, self)		#uses the interfaceShell object for connecting to sub-interface
+		self.name = name
+		
+		
+#----UTILITY CLASSES---------------
+class CRC():
+	'''Generates CRC bytes and checks CRC validated packets.'''
+	def __init__(self):
+		self.polynomial = 7		#CRC-8: ATM=7, Dallas-Maxim = 49
+		self.crcTableGen()
 	
+	def calculateByteCRC(self, byteValue):
+		'''Calculates Bytes in the CRC Table.'''
+		for i in range(8):
+			byteValue = byteValue << 1
+			if (byteValue//256) == 1:
+				byteValue = byteValue - 256
+				byteValue = byteValue ^ self.polynomial
+		return byteValue
+	
+	def crcTableGen(self):
+		'''Generates a CRC table to make CRC generation faster.'''
+		self.crcTable = []
+		for i in range(256):
+			self.crcTable += [self.calculateByteCRC(i)]
+	
+	def __call__(self, packet):
+		'''Generates CRC for an input packet.'''
+		#INITIALIZE CRC ALGORITHM
+		crc = 0
+		crcByte = 0
+		
+		#CALCULATE CRC AND CONVERT preOutput BYTES TO CHR
+		output = []
+		for byte in packet:
+			crcByte = byte^crc
+			crc = self.crcTable[crcByte]
+			output += [byte]
+		output += [crc]	#write crc to output
+		return output	#NOTE: OUTPUT HAS BEEN CONVERTED TO A STRING
+	
+	def validate(self, packet): #NOTE: ASSUMES INPUT IS A LIST OF NUMBERS
+		'''Checks CRC byte against packet.'''
+		crc = 0
+		crcByte = 0
+		packetLength = len(packet)
+		
+		for char in packet[0:packetLength]:
+			crcByte = char^crc
+			crc = self.crcTable[crcByte]
+		
+		if crc != 0:	return False	#CRC doesn't match
+		else:	return True	#CRC matches
+	
+#----METHODS-----------------------
+def serialize(packet):
+	'''Converts packet into a string for transmission over a serial port.'''
+	if type(packet) == list:
+		return ''.join([chr(byte) for byte in packet])		
+	elif type(packet) == str:
+		return packet
+	else:
+		print "Error: Packet must be either a list or a string."
+		return False
