@@ -4,30 +4,33 @@ import os
 import platform
 import time
 import Queue
-from gestalt.utilities import notice as notice
+import threading
+from gestalt.utilities import notice
+from gestalt import packets
+from gestalt import functions
 
 
 #----INTERFACE CLASSES------------
 class interfaceShell(object):
 	'''Allows both the node and shell node to access the interface by acting as an intermediary.'''
-	def __init__(self, interface = None, owner = None):
-		self.set(interface, owner)
+	def __init__(self, Interface = None, owner = None):
+		self.set(Interface, owner)
 		
-	def set(self, interface, owner = None):
+	def set(self, Interface, owner = None):
 		'''Updates the interface contained by the shell'''
 		if owner: self.owner = owner	#update owner
-		self.interface = interface		#update interface
-		if interface: self.interface.owner = self.owner		#if interface, set owner
+		self.Interface = Interface		#update interface
+		if Interface: self.Interface.owner = self.owner		#if interface, set owner
 	
 	def setOwner(self, owner):
 		'''Updates the owner of the interface contained by the shell'''
 		self.owner = owner	#used in the port acquisition process
-		if self.interface:
-			self.interface.owner = owner
+		if self.Interface:
+			self.Interface.owner = owner
 	
 	def __getattr__(self, attribute):
 		'''Forwards attribute calls to the linked interface.'''
-		return getattr(self.interface, attribute)
+		return getattr(self.Interface, attribute)
 	
 	
 class baseInterface(object):
@@ -92,7 +95,7 @@ class devInterface(baseInterface):
 		
 class serialInterface(devInterface):
 	'''Provides an interface to nodes connected thru a serial port on the host machine.'''
-	def __init__(self, baudRate, portName = None, timeOut = 0.2):
+	def __init__(self, baudRate, portName = None, interfaceType = None, timeOut = 0.2):
 		self.baudRate = baudRate
 		self.portName = portName
 		self.timeOut = timeOut
@@ -106,6 +109,8 @@ class serialInterface(devInterface):
 		#if port name is provided, auto-connect
 		if self.portName:
 			self.connect(self.portName)
+		elif interfaceType: #if an interface type is provided, auto-acquire
+			self.acquirePort(interfaceType)
 	
 	def getAvailablePorts(self, ports):
 		'''tests all provided ports and returns a subset of ports that are available'''
@@ -231,8 +236,162 @@ class gestaltInterface(baseInterface):
 	'''Interface to Gestalt nodes based on the Gestalt protocol.'''
 	def __init__(self, name = None, interface = None):
 		self.interface = interfaceShell(interface, self)		#uses the interfaceShell object for connecting to sub-interface
-		self.name = name
+		self.name = name	#name becomes important for networked gestalt
 		
+		self.receiveQueue = Queue.Queue()
+		self.CRC = CRC()
+		self.nodeManager = self.nodeManager()	#used to map network addresses (physical devices) to nodes
+		
+		self.startReceiver()
+		
+		#define standard gestalt packet
+		self.gestaltPacket = packets.packet(template = [	packets.pInteger('startByte', 1),
+										packets.pList('address', 2),
+										packets.pInteger('port', 1),
+										packets.pLength(),
+										packets.pList('payload')])
+	
+	def validateIP(self, IP):
+		'''Makes sure that an IP address isn't already in use on the interface.'''
+		if str(IP) in self.nodeManager.address_node: return False
+		else: return True
+		
+	class nodeManager(object):
+		'''Manages all nodes under the control of this interface.'''
+		def __init__(self):
+			self.node_address = {}	#node : address
+			self.address_node = {}	#address: node
+
+		def updateNodesAddresses(self, node, address):
+			oldNode = None
+			oldAddress = None
+			
+			if str(address) in self.address_node: oldNode = self.address_node[str(address)]
+			if node in self.node_address: oldAddress = self.node_address[node]
+			
+			if str(oldAddress) in self.address_node: self.address_node.pop(str(oldAddress))
+			if oldNode in self.node_address: self.node_address.pop(oldNode)
+			
+			self.address_node.update({str(address):node})
+			self.node_address.update({node:address})
+		
+		def getIP(self, node):
+			'''Returns IP address for a given node.'''
+			if node in self.node_address: return self.node_address[node]
+			else: return False
+		
+		def getNode(self, IP):
+			IP = str(IP)
+			if IP in self.address_node: return self.address_node[IP]
+			else: return False
+	
+	def assignNode(self, node, address):
+		'''Assigns a given node to the interface on a particular address.'''
+		self.nodeManager.updateNodesAddresses(node, address)
+	
+	def transmit(self, nodeSet, mode = 'unicast'):
+		'''Transmits a packet set over the interface.'''
+		#--BUILD START BYTE TABLE--
+		startByteTable = {'unicast': 72, 'multicast': 138}	#unicast transmits to addressed node, multicast to all nodes on network
+		if mode in startByteTable:
+			startByte = startByteTable[mode]
+		else:
+			startByte = startByteTable['unicast']
+
+		#--TRANSMIT PACKETS--
+		#//FIX// doesn't yet support synchrony
+		for functionCore in nodeSet:	#iterate over nodes in the nodeSet
+			packetSet = functionCore.getPacketSet()	#get packetSet from command object
+			port = functionCore.getPort()
+			address = self.nodeManager.getIP(functionCore.virtualNode)
+			for packet in packetSet:
+				packetRoutable = self.gestaltPacket({'startByte':startByte, 'address': address, 'port':port, 'payload':packet})	#build packet
+				packetWChecksum = self.CRC(packetRoutable)	#generate CRC
+				self.interface.transmit(packetWChecksum)	#transmit packet thru interface
+		
+	def startReceiver(self):
+		'''Initiates the receiver thread.'''
+		#START RECEIVE THREAD
+		self.receiver = self.receiveThread(self)
+		self.receiver.daemon = True
+		self.receiver.start()
+		self.packetRouter = self.packetRouterThread(self)
+		self.packetRouter.daemon = True
+		self.packetRouter.start()		
+
+	class receiveThread(threading.Thread):
+		def __init__(self, interface):
+			threading.Thread.__init__(self)
+			self.interface = interface
+			print "GESTALT INTERFACE RECEIVE THREAD INITIALIZED"
+			
+		def run(self):
+			packet = []
+			inPacket = False
+			packetPosition = 0
+			packetLength = 5	
+			
+			while True:
+				byte = self.interface.interface.receive()	#get byte
+				if byte:
+					byte = ord(byte) #converts char to byte
+					if not inPacket:
+						if byte == 72 or byte == 138:	#waits for start byte
+							inPacket = True
+							packet += [byte]	#adds start byte to packet
+							packetPosition += 1	#increment packet position
+							continue	#otherwise rejects packet
+					else:	#in a packet
+						packet += [byte] #append byte to packet
+						
+						if packetPosition == 4:	#byte 2 contains the packet position
+							packetLength = byte
+							packetPosition += 1 #increment packet position
+							continue
+						
+						if packetPosition < packetLength:
+							packetPosition += 1 #increment packet position
+							continue
+						
+						if packetPosition == packetLength:
+							if self.interface.CRC.validate(packet): self.interface.packetRouter.routerQueue.put(packet[:len(packet)-1])	#check CRC, then send to router (minus CRC)
+							
+				#initialize packet
+				packet = []
+				inPacket = False
+				packetPosition = 0
+				packetLength = 5
+				
+				time.sleep(0.0005)
+		
+	class packetRouterThread(threading.Thread):
+		def __init__(self, interface):
+			threading.Thread.__init__(self)
+			self.interface = interface
+			self.routerQueue = Queue.Queue()
+			print "GESTALT INTERFACE PACKET ROUTER THREAD INITIALIZED"
+		
+		def run(self):
+			while True:
+				routerState, routerPacket = self.getRouterPacket()
+				if routerState:
+					parsedPacket = self.interface.gestaltPacket.decode(routerPacket)
+					address = parsedPacket['address']
+					port = parsedPacket['port']
+					data = parsedPacket['payload']
+					destinationNode = self.interface.nodeManager.getNode(address)
+					if not destinationNode:
+						print "PACEKT RECEIVED FOR UNKNOWN ADDRESS "+ str(address)
+						continue
+					destinationNode.route(port, data)
+					
+				time.sleep(0.0005)
+
+		def getRouterPacket(self):
+			try:
+				return True, self.routerQueue.get()
+			except:
+				return False, None
 		
 #----UTILITY CLASSES---------------
 class CRC():
