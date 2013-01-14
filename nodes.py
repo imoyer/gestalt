@@ -6,7 +6,7 @@ from gestalt import interfaces
 
 #----NODE SHELLS------------
 class baseNodeShell(object):
-	'''	The basic container for gestalt nodes.
+	'''	The basic container for all nodes.
 		
 		baseNodeShell gets subclassed by more specific shells for one of the four types of gestalt nodes:
 		->Solo/Independent: arbitrary interface/ arbitrary protocol
@@ -145,7 +145,13 @@ class soloIndependentNode(baseNodeShell):
 			notice(self, "no node source was provided.")
 			notice(self, "please provide a filename, URL, or class")
 
-class soloGestaltNode(baseNodeShell):
+class gestaltNodeShell(baseNodeShell):
+	'''Base class for all nodes which communicate using the gestalt protocol.'''
+	def __init__(self):
+		super(gestaltNodeShell, self).__init__()	#call init on baseNodeShell
+
+
+class soloGestaltNode(gestaltNodeShell):
 	'''	A container shell for Solo/Gestalt nodes.
 	
 		Solo/Gestalt nodes are non-networked and use the gestalt communications protocol.
@@ -168,7 +174,7 @@ class soloGestaltNode(baseNodeShell):
 		'''
 
 		#call base class __init__ method
-		super(soloIndependentNode, self).__init__()
+		super(soloGestaltNode, self).__init__()
 		
 		#assign parameters to variables
 		self.name = name
@@ -180,8 +186,9 @@ class soloGestaltNode(baseNodeShell):
 		if interface:
 			self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
 		else:
-			self.interface.set(interfaces.serialInterface(baudRate = 115200))
+			self.interface.set(interfaces.serialInterface(baudRate = 115200), self)
 			self.interface.acquirePort('lufa')
+
 
 #----VIRTUAL NODES------------
 	

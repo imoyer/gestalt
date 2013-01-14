@@ -3,6 +3,7 @@ import serial	#for connecting to serial ports
 import os
 import platform
 import time
+import Queue
 from gestalt.utilities import notice as notice
 
 
@@ -99,6 +100,8 @@ class serialInterface(devInterface):
 		self.owner = None
 		#self.owner gets set by the interface shell, and contains a reference to the owning object
 		#this is useful to refer to the name of the object when acquiring the interface
+		self.port = None	#will be replaced with a serial object when port is acquired
+		self.transmitQueue = Queue.Queue()	#a queue is used to allow multiple threads to call transmit simultaneously.
 		
 		#if port name is provided, auto-connect
 		if self.portName:
@@ -159,6 +162,22 @@ class serialInterface(devInterface):
 			notice(self, 'no port name provided.')
 			return False
 			
+	def disconnect(self):
+		'''Disconnects from serial port.'''
+		self.port.close()
+		self.isConnected = False
+		
+	def setDTR(self):
+		'''Used to reset the Arduino hardware.'''
+		if self.serialPort:
+			self.serialPort.setDTR()
+		return	
+	
+	def startTransmitter(self):
+		'''Starts the transmit thread.'''
+		self.transmitter = self.transmitThread(self.transmitQueue, self.serialPort)
+		self.transmitter.daemon = True
+		self.transmitter.start()
 	
 	def connectToPort(self, portName):
 		'''Actually connects the interface to the port'''
@@ -174,4 +193,8 @@ class serialInterface(devInterface):
 			notice(self, "error opening serial port "+ str(portName))
 			return False
 		
+class gestaltInterface(baseInterface):
+	'''Interface to Gestalt nodes based on the Gestalt protocol.'''
+	def __init__(self, interface = None):
+		pass
 	
