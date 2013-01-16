@@ -2,6 +2,9 @@
 import imp	#for importing files as modules
 import random
 import threading
+import time
+import os
+import urllib
 from gestalt.utilities import notice as notice
 from gestalt import interfaces
 from gestalt import functions
@@ -12,6 +15,7 @@ from gestalt import packets
 class baseNodeShell(object):
 	'''	The basic container for all nodes.
 		
+		Like a room in a hotel, that has different occupants and offers certain amenities to its guests.
 		baseNodeShell gets subclassed by more specific shells for one of the four types of gestalt nodes:
 		->Solo/Independent: arbitrary interface/ arbitrary protocol
 		->Solo/Gestalt: arbitrary interface/ gestalt protocol
@@ -196,19 +200,34 @@ class soloGestaltNode(gestaltNodeShell):
 		if interface:
 			self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
 		else:
-			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 115200, portName = '/dev/tty.usbmodemfa131', interfaceType = 'lufa')), self)
-			
+			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, 
+																								portName = '/dev/tty.usbmodemfd121', 
+																								interfaceType = 'lufa',
+																								owner = self)), self)
 		#import base node
 		self.setNode(baseSoloGestaltNode())		
 		
 		#set node IP address	-- this will be changed later once persistence is added
-		IP = self.generateIPAddress()
+		IP = self.generateIPAddress()	#generate random IP address
+		self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
+		nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retreive URL
+		
+		#if a virtual node source is provided, use that. Otherwise acquire from URL provided by node.
+		if filename:
+			if not self.loadNodeFromFile(filename, **kwargs): return
+		#load via URL
+		elif URL:
+			if not self.loadNodeFromURL(URL, **kwargs): return
+		#load via module
+		elif module:
+			if not self.loadNodeFromModule(module, **kwargs): return
+		#get URL from node
+		else:
+			if not self.loadNodeFromURL(nodeURL): return
+			
+		#assign new node with old IP address to interface
 		self.interface.assignNode(self.node, IP)
 		
-		print self.node.setIPRequest(IP)
-
-		
-
 
 #----VIRTUAL NODES------------
 	
@@ -416,7 +435,7 @@ class baseSoloGestaltNode(baseGestaltNode):
 			def init(self, IP):
 				self.updatePacketSet({'setAddress':IP})
 				self.transmit('multicast')
-				if self.waitForResponse(15):
+				if self.waitForResponse(1):
 					time.sleep(1)	#debounce for button press
 					return self.getPacket()['URL']
 				else:

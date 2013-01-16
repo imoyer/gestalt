@@ -95,12 +95,12 @@ class devInterface(baseInterface):
 		
 class serialInterface(devInterface):
 	'''Provides an interface to nodes connected thru a serial port on the host machine.'''
-	def __init__(self, baudRate, portName = None, interfaceType = None, timeOut = 0.2):
+	def __init__(self, baudRate, portName = None, interfaceType = None, owner = None, timeOut = 0.2):
 		self.baudRate = baudRate
 		self.portName = portName
 		self.timeOut = timeOut
 		self.isConnected = False
-		self.owner = None
+		self.owner = owner
 		#self.owner gets set by the interface shell, and contains a reference to the owning object
 		#this is useful to refer to the name of the object when acquiring the interface
 		self.port = None	#will be replaced with a serial object when port is acquired
@@ -176,6 +176,7 @@ class serialInterface(devInterface):
 			notice(self, "port " + str(portName) + " connected succesfully.")
 			time.sleep(2)	#some serial ports require a brief amount of time between opening and transmission
 			self.isConnected = True
+			self.startTransmitter()
 			return True
 		except:
 			notice(self, "error opening serial port "+ str(portName))
@@ -200,8 +201,9 @@ class serialInterface(devInterface):
 	
 	def transmit(self, data):
 		'''Sends request for data to be transmitted over the serial port. Format is as a list.'''
-		self.transmitQueue.put(data)	#converts to list in case data comes in as a string.
-		
+		if self.isConnected:
+			self.transmitQueue.put(data)	#converts to list in case data comes in as a string.
+		else: notice(self, 'serialInterface is not connected.')
 	class transmitThread(threading.Thread):
 		'''Handles transmitting data over the serial port.'''
 		def __init__(self, transmitQueue, port):
@@ -211,7 +213,7 @@ class serialInterface(devInterface):
 		
 		def run(self):
 			'''Code run by the transmit thread.'''
-			while true:
+			while True:
 				transmitState, transmitPacket = self.getTransmitPacket()
 				if transmitState:
 					if self.port:
@@ -226,10 +228,11 @@ class serialInterface(devInterface):
 			except:
 				return False, None
 
-		def receive(self):
-			'''Grabs one byte from the serial port with no timeout.'''
-			if self.port: return self.port.read()
-			else: return None
+	def receive(self):
+		'''Grabs one byte from the serial port with no timeout.'''
+		if self.port: 
+			return self.port.read()
+		else: return None
 		
 		
 class gestaltInterface(baseInterface):
@@ -323,7 +326,7 @@ class gestaltInterface(baseInterface):
 		def __init__(self, interface):
 			threading.Thread.__init__(self)
 			self.interface = interface
-			print "GESTALT INTERFACE RECEIVE THREAD INITIALIZED"
+#			print "GESTALT INTERFACE RECEIVE THREAD INITIALIZED"
 			
 		def run(self):
 			packet = []
@@ -369,7 +372,7 @@ class gestaltInterface(baseInterface):
 			threading.Thread.__init__(self)
 			self.interface = interface
 			self.routerQueue = Queue.Queue()
-			print "GESTALT INTERFACE PACKET ROUTER THREAD INITIALIZED"
+#			print "GESTALT INTERFACE PACKET ROUTER THREAD INITIALIZED"
 		
 		def run(self):
 			while True:
