@@ -200,10 +200,7 @@ class soloGestaltNode(gestaltNodeShell):
 		if interface:
 			self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
 		else:
-			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, 
-																								portName = '/dev/tty.usbmodemfd121', 
-																								interfaceType = 'lufa',
-																								owner = self)), self)
+			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, interfaceType = 'lufa'), owner = self), self)
 		#import base node
 		self.setNode(baseSoloGestaltNode())		
 		

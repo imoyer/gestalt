@@ -20,7 +20,8 @@ class interfaceShell(object):
 		'''Updates the interface contained by the shell'''
 		if owner: self.owner = owner	#update owner
 		self.Interface = Interface		#update interface
-		if Interface: self.Interface.owner = self.owner		#if interface, set owner
+		if Interface and self.owner: self.Interface.owner = self.owner		#if interface, set owner
+		if Interface: Interface.initAfterSet()	#initializes after owner is set, so that owner is reported correctly to user.
 	
 	def setOwner(self, owner):
 		'''Updates the owner of the interface contained by the shell'''
@@ -35,7 +36,9 @@ class interfaceShell(object):
 	
 class baseInterface(object):
 	''' This base class could eventually provide a common foundation for all interfaces '''
-	pass
+	def initAfterSet(self):
+		'''This method gets called when an interface is set into an interface shell.'''
+		pass
 
 	
 class devInterface(baseInterface):
@@ -104,13 +107,15 @@ class serialInterface(devInterface):
 		#self.owner gets set by the interface shell, and contains a reference to the owning object
 		#this is useful to refer to the name of the object when acquiring the interface
 		self.port = None	#will be replaced with a serial object when port is acquired
+		self.interfaceType = interfaceType
 		self.transmitQueue = Queue.Queue()	#a queue is used to allow multiple threads to call transmit simultaneously.
-		
+
+	def initAfterSet(self):		
 		#if port name is provided, auto-connect
 		if self.portName:
 			self.connect(self.portName)
-		elif interfaceType: #if an interface type is provided, auto-acquire
-			self.acquirePort(interfaceType)
+		elif self.interfaceType: #if an interface type is provided, auto-acquire
+			self.acquirePort(self.interfaceType)
 	
 	def getAvailablePorts(self, ports):
 		'''tests all provided ports and returns a subset of ports that are available'''
@@ -237,9 +242,10 @@ class serialInterface(devInterface):
 		
 class gestaltInterface(baseInterface):
 	'''Interface to Gestalt nodes based on the Gestalt protocol.'''
-	def __init__(self, name = None, interface = None):
-		self.interface = interfaceShell(interface, self)		#uses the interfaceShell object for connecting to sub-interface
+	def __init__(self, name = None, interface = None, owner = None):
 		self.name = name	#name becomes important for networked gestalt
+		self.owner = owner
+		self.interface = interfaceShell(interface, self)		#uses the interfaceShell object for connecting to sub-interface
 		
 		self.receiveQueue = Queue.Queue()
 		self.CRC = CRC()
