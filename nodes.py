@@ -200,7 +200,7 @@ class soloGestaltNode(gestaltNodeShell):
 		if interface:
 			self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
 		else:
-			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, interfaceType = 'lufa'), owner = self), self)
+			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, interfaceType = 'lufa', portName = "/dev/tty.usbmodemfa1331"), owner = self), self)
 		#import base node
 		self.setNode(baseSoloGestaltNode())		
 		
@@ -208,6 +208,8 @@ class soloGestaltNode(gestaltNodeShell):
 		IP = self.generateIPAddress()	#generate random IP address
 		self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
 		nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retreive URL
+		print nodeURL
+		return
 		
 		#if a virtual node source is provided, use that. Otherwise acquire from URL provided by node.
 		if filename:
