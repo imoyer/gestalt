@@ -71,11 +71,12 @@ class baseNodeShell(object):
 		
 			Assumes that this is called from a node shell that has defined self.name'''
 		try: 
-			self.setNode(imp.load_source('', filename).virtualNode(self, **kwargs))
+			self.setNode(imp.load_source('', filename).virtualNode(**kwargs))
 			notice(self, "loaded node from:  " + filename)
 			return True
-		except IOError:
+		except IOError, error:
 			notice(self, "error loading file.")
+			print error
 			return False
 	
 	
@@ -198,9 +199,12 @@ class soloGestaltNode(gestaltNodeShell):
 		
 		#connect to interface
 		if interface:
-			self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
+			if type(interface) != interfaces.gestaltInterface:
+				#wrap a gestalt interface around the provided interface
+				self.interface.set(interfaces.gestaltInterface(interface = interface, owner = self), self)
+			else: self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
 		else:
-			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, interfaceType = 'lufa', portName = "/dev/tty.usbmodemfa1331"), owner = self), self)
+			self.interface.set(interfaces.gestaltInterface(interface = interfaces.serialInterface(baudRate = 76800, interfaceType = 'lufa', portName = "/dev/tty.usbmodemfd1231"), owner = self), self)
 		#import base node
 		self.setNode(baseSoloGestaltNode())		
 		
@@ -208,8 +212,6 @@ class soloGestaltNode(gestaltNodeShell):
 		IP = self.generateIPAddress()	#generate random IP address
 		self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
 		nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retreive URL
-		print nodeURL
-		return
 		
 		#if a virtual node source is provided, use that. Otherwise acquire from URL provided by node.
 		if filename:
