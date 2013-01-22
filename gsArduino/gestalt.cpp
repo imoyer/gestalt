@@ -96,6 +96,24 @@ uint8_t txData = 0;
 uint8_t txPacketLength = 0;
 uint8_t txPacketChecksum = 0;
 
+//--DEFINE PACKET FORMAT--
+const uint8_t startByteLocation   = 0;
+const uint8_t addressLocation     = 1;	//two bytes for address
+const uint8_t portLocation        = 3;
+const uint8_t lengthLocation      = 4;
+//const uint8_t payloadLocation     = 5;	defined in header
+
+const uint8_t unicast             = 72;  //start byte value for unicast packet
+const uint8_t multicast		  = 138; //start byte value for multicast packet
+const uint8_t basePacketLength			= 5; //[start, address1, address0, port, length, checksum]
+
+//--DEFINE PORTS----
+const uint8_t statusPort		= 1;
+const uint8_t urlPort				= 5;
+const uint8_t setIPPort			= 6;
+const uint8_t identifyPort	= 7;
+const uint8_t resetPort			= 255;
+
 //--DEFINE TRANCEIVER SETTINGS--
 const uint8_t watchdogTimeout = 1;  //timeout in units of timer2 - around 1ms with prescalar of 64 @ 16MHz
 
@@ -114,17 +132,6 @@ typedef struct {  //http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewto
 #define packetReceivedFlag ((volatile PackedBool*)(&GPIOR0))->f7
 #define packetInboundFlag ((volatile PackedBool*)(&GPIOR0))->f6
 #define packetOutboundFlag ((volatile PackedBool*)(&GPIOR0))->f5
-
-
-//--DEFINE PACKET FORMAT--
-const uint8_t startByteLocation   = 0;
-const uint8_t addressLocation     = 1;	//two bytes for address
-const uint8_t portLocation        = 3;
-const uint8_t lengthLocation      = 4;
-const uint8_t payloadLocation     = 5;
-
-const uint8_t unicast             = 72;  //start byte value for unicast packet
-const uint8_t multicast		  = 138; //start byte value for multicast packet
 
 
 // CRC TABLE
@@ -279,6 +286,19 @@ void transmitPacket(){
   UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<<UDRIE0);  //enables interrupts on data empty, which triggers the first transmission
 }
 
+void transmitUnicastPacket(uint8_t port, uint8_t length){
+  txBuffer[startByteLocation] = unicast;
+  txBuffer[portLocation] = port;
+  txBuffer[lengthLocation] = basePacketLength + length;
+  }
+
+void transmitMulticastPacket(uint8_t port, uint8_t length ){
+  txBuffer[startByteLocation] = multicast;
+  txBuffer[portLocation] = port;
+  txBuffer[lengthLocation] = basePacketLength + length;
+  }
+	
+
 //------MAIN CODE---------------------------
 
 
@@ -293,22 +313,22 @@ void packetRouter(){
     uint8_t destinationPort = rxBuffer[portLocation];  //gets destination port
     //--PORT TABLE--
     switch(destinationPort){
-      case 1:	//status request
+      case statusPort:	//status request
         svcStatus();
         break;		
-			case 5: //request URL
+			case urlPort: //request URL
 				svcRequestURL();
 			break;
 		
-			case 6: //set IP address
+			case setIPPort: //set IP address
 				svcSetIPAddress();
 				break;
 		
-			case 7: //identify node
+			case identifyPort: //identify node
 				svcIdentifyNode();
 				break;
 					
-			case 255: //reset node
+			case resetPort: //reset node
 				svcResetNode();
 				break;
 			
@@ -337,15 +357,11 @@ void svcIdentifyNode(){
 
 //--REQUEST URL--
 void svcRequestURL(){
-	txBuffer[startByteLocation] = unicast;
-	txBuffer[portLocation] = 5;
-//	txBuffer[lengthLocation] = 5 + urlLength;
-	txBuffer[lengthLocation] = 5 + urlLength;
 	uint8_t offset = 0;
 	for(offset = 0; offset<urlLength; offset++){
 		txBuffer[payloadLocation+offset] = *(url + offset);
 	}
-	transmitPacket();
+	transmitUnicastPacket(urlPort, urlLength);
 }
 
 //--SET IP ADDRESS--
@@ -354,25 +370,19 @@ void svcSetIPAddress(){
 	networkAddress[1] = rxBuffer[payloadLocation+1];
 	eeprom_write_byte((uint8_t*)persistentIPAddress0, networkAddress[0]);	//store IP address in eeprom
 	eeprom_write_byte((uint8_t*)persistentIPAddress1, networkAddress[1]);
-	txBuffer[startByteLocation] = multicast;
-	txBuffer[portLocation] = 6;
-	txBuffer[lengthLocation] = 5 + urlLength;
 	uint8_t offset = 0;
 	for(offset = 0; offset<urlLength; offset++){	//transmit URL
 		txBuffer[payloadLocation+offset] = *(url+offset);
 	}
 //	UIPort &= ~(_BV(ledPin));	//turn off LED
-	transmitPacket();
+	transmitMulticastPacket(setIPPort, urlLength);
 }	
 		
 
 //--STATUS REQUEST--
 void svcStatus(){
-   txBuffer[startByteLocation] = unicast;
-   txBuffer[portLocation] = 1;
-   txBuffer[lengthLocation] = 7;  //five header bytes, two payload byte, and checksum
    txBuffer[payloadLocation] = 65;	//send "A" to indicate application space program.
-   transmitPacket();
+   transmitUnicastPacket(statusPort, 2);
 }
 
 void svcResetNode(){

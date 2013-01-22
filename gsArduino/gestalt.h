@@ -37,7 +37,14 @@ extern "C"{
 #endif
 
 #include <inttypes.h>
-  
+
+//PACKET FORMAT DEFINITIONS
+// const uint8_t startByteLocation   = 0;
+// const uint8_t addressLocation     = 1;	//two bytes for address
+// const uint8_t portLocation        = 3;
+// const uint8_t lengthLocation      = 4;
+const uint8_t payloadLocation     = 5;
+
 //PRIVATE FUNCTIONS
 void setup();
 void loop();
@@ -50,9 +57,12 @@ void svcResetNode();
 
 //PUBLIC FUNCTIONS
 void transmitPacket();
+void transmitUnicastPacket(uint8_t port, uint8_t length);
+void transmitMulticastPacket(uint8_t port, uint8_t length);
 void userSetup();
 void userPacketRouter(uint8_t destinationPort);
 void setURL(char *newURL, uint8_t newURLLength);
+
 
 #ifdef __cplusplus
 }	//extern "C"
