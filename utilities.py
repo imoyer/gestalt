@@ -6,24 +6,24 @@ def notice(source = None, message = ""):
 	if hasattr(source, 'name'):
 		name = getattr(source, 'name')
 		if name:
-			print name + ": " + message
+			print name + ": " + str(message)
 		elif hasattr(source, 'owner'):
 			owner = getattr(source, 'owner')
 			if owner:
 				notice(source.owner, message)
 			else:
-				print str(source) + ": " + message
+				print str(source) + ": " + str(message)
 		else:
-			print str(source) + ": " + message
+			print str(source) + ": " + str(message)
 	else:
 		if hasattr(source, 'owner'):
 			owner = getattr(source, 'owner')
 			if owner:
 				notice(source.owner, message)
 			else:
-				print str(source) + ": " + message
+				print str(source) + ": " + str(message)
 		else:
-			print str(source) + ": " + message
+			print str(source) + ": " + str(message)
 
 def intToBytes(integer, numbytes):
 	bytes = range(numbytes)
@@ -103,6 +103,7 @@ def vectorMax(vector):
 	return vMax
 
 class intelHexParser(object):
+	'''Parses Intel Hex Files for Bootloading and Memory Programming.'''
 	def __init__(self):
 		self.filename = None
 		self.hexFile = None

@@ -237,7 +237,9 @@ class serialInterface(devInterface):
 		'''Grabs one byte from the serial port with no timeout.'''
 		if self.port: 
 			return self.port.read()
-		else: return None
+		else:
+			print "WOOPS"
+			return None
 		
 		
 class gestaltInterface(baseInterface):
@@ -344,6 +346,7 @@ class gestaltInterface(baseInterface):
 				byte = self.interface.interface.receive()	#get byte
 				if byte:
 					byte = ord(byte) #converts char to byte
+					print byte
 					if not inPacket:
 						if byte == 72 or byte == 138:	#waits for start byte
 							inPacket = True
