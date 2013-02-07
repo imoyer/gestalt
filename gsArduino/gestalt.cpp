@@ -290,12 +290,14 @@ void transmitUnicastPacket(uint8_t port, uint8_t length){
   txBuffer[startByteLocation] = unicast;
   txBuffer[portLocation] = port;
   txBuffer[lengthLocation] = basePacketLength + length;
+  transmitPacket();
   }
 
 void transmitMulticastPacket(uint8_t port, uint8_t length ){
   txBuffer[startByteLocation] = multicast;
   txBuffer[portLocation] = port;
   txBuffer[lengthLocation] = basePacketLength + length;
+  transmitPacket();
   }
 	
 

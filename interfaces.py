@@ -5,6 +5,7 @@ import platform
 import time
 import Queue
 import threading
+import socket
 from gestalt.utilities import notice
 from gestalt import packets
 from gestalt import functions
@@ -40,6 +41,28 @@ class baseInterface(object):
 		'''This method gets called when an interface is set into an interface shell.'''
 		pass
 
+class socketInterface(baseInterface):
+	def __init__(self, IPAddress = '', IPPort = 27272):	#all avaliable interfaces, port 27272
+		self.receiveIPAddress = IPAddress
+		self.receiveIPPort = IPPort
+
+class socketUDPServer(socketInterface):
+	
+	def initAfterSet(self):	#gets called once interface is set into shell.
+		self.receiveSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)	#UDP, would be socket.SOCK_STREAM for TCP
+		self.receiveSocket.bind((self.receiveIPAddress, self.receiveIPPort))	#bind to socket
+		notice(self, "opened socket on " + str(self.receiveIPAddress) + " port " + str(self.receiveIPPort))
+		self.transmitSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	
+	def receive(self):
+		data, addr = self.receiveSocket.recvfrom(1024)
+		notice(self, "'" + str(data) + "' from " + str(addr))
+		return (data, addr)
+	
+	def transmit(self, remoteIPAddress, remoteIPPort, data):
+#		self.transmitSocket.sendto(data, (remoteIPAddress, remoteIPPort))
+		self.receiveSocket.sendto(data, (remoteIPAddress, remoteIPPort))
+		
 	
 class devInterface(baseInterface):
 	''' Base class for interfaces mounted in the /dev/ folder.'''
@@ -238,7 +261,6 @@ class serialInterface(devInterface):
 		if self.port: 
 			return self.port.read()
 		else:
-			print "WOOPS"
 			return None
 		
 		
@@ -346,7 +368,6 @@ class gestaltInterface(baseInterface):
 				byte = self.interface.interface.receive()	#get byte
 				if byte:
 					byte = ord(byte) #converts char to byte
-					print byte
 					if not inPacket:
 						if byte == 72 or byte == 138:	#waits for start byte
 							inPacket = True

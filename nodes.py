@@ -106,8 +106,8 @@ class baseNodeShell(object):
 				self.setNode(module(**kwargs))
 			notice(self, "loaded module " + str(module.__name__))
 			return True
-		except AttributeError:
-			notice(self, "unable to load module.")
+		except AttributeError, err:
+			notice(self, "unable to load module: " + str(err))
 			return False
 
 

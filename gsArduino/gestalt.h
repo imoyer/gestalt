@@ -45,6 +45,10 @@ extern "C"{
 // const uint8_t lengthLocation      = 4;
 const uint8_t payloadLocation     = 5;
 
+// --DEFINE TRANCEIVER MEMORY--
+extern uint8_t txBuffer[255];  //transmitter buffer
+extern uint8_t rxBuffer[255];  //receiver buffer
+
 //PRIVATE FUNCTIONS
 void setup();
 void loop();
