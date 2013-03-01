@@ -1,6 +1,7 @@
 #----IMPORTS------------
 import serial	#for connecting to serial ports
 import os
+import sys
 import platform
 import time
 import Queue
@@ -221,6 +222,14 @@ class serialInterface(devInterface):
 			self.port.setDTR()
 		return	
 	
+	def setTimeout(self, timeout):
+		'''Sets timeout for receiving on port.'''
+		if self.port:
+			try:
+				self.port.timeout = timeout
+			except:
+				notice(self, "could not set timeout: " + sys.exc_info()[0])
+				
 	def startTransmitter(self):
 		'''Starts the transmit thread.'''
 		self.transmitter = self.transmitThread(self.transmitQueue, self.port)
@@ -257,11 +266,16 @@ class serialInterface(devInterface):
 				return False, None
 
 	def receive(self):
-		'''Grabs one byte from the serial port with no timeout.'''
+		'''Grabs one byte from the serial port.'''
 		if self.port: 
 			return self.port.read()
 		else:
 			return None
+	
+	def flushInput(self):
+		'''Flushes the input buffer.'''
+		self.port.flushInput()
+		return
 		
 		
 class gestaltInterface(baseInterface):

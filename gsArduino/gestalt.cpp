@@ -14,6 +14,8 @@
 //  |01/13/13 | UPDATED FOR ARDUINO UNO                  | ILAN E. MOYER     | gsArduinoUno.ino            |
 //  |---------|------------------------------------------|-------------------|-----------------------------|
 //  |01/18/13 | LIBRARY FOR ARDUINO UNO                  | ILAN E. MOYER     | gestalt.cpp		             |
+//  |---------|------------------------------------------|-------------------|-----------------------------|
+//  |02/28/13 | MODIFIED TO SUPPORT EXTERNAL IO DEF.     | ILAN E. MOYER     | gestalt.cpp                 |
 //  --------------------------------------------------------------------------------------------------------
 //
 //  --ABOUT GESTALT-------------------------------------
@@ -46,9 +48,10 @@ extern "C"{
 #include <avr/eeprom.h>
 #include <avr/wdt.h>
 
+//--DEFINE IO--
 
-// --DEFINE STANDARD PINS AND PORTS--
-//--ui--
+
+
 #define UIPort			        PORTB
 #define UIDir								DDRB
 #define UIPin								PINB
@@ -67,6 +70,7 @@ extern "C"{
 
 #define txrxDirInit		(1<<txPin)
 #define txrxPortInit	        (1<<rxPin)	//enable pullups on rxpin
+
 
 
 //--DEFINE NODE VARIABLES--
