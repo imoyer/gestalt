@@ -38,6 +38,7 @@ extern "C"{
 
 #include <inttypes.h>
 
+
 //PACKET FORMAT DEFINITIONS
 // const uint8_t startByteLocation   = 0;
 // const uint8_t addressLocation     = 1;	//two bytes for address
@@ -49,6 +50,28 @@ const uint8_t payloadLocation     = 5;
 extern uint8_t txBuffer[255];  //transmitter buffer
 extern uint8_t rxBuffer[255];  //receiver buffer
 
+// --DEFINE IO PORTS AND PINS--
+#ifdef standardGestalt
+extern volatile uint8_t *IO_ledPORT; //The led which is used to identify nodes on the network.
+extern volatile uint8_t *IO_ledDDR;
+extern volatile uint8_t *IO_ledPIN;
+extern volatile uint8_t IO_ledPin;
+
+extern volatile uint8_t *IO_buttonPORT;  //The button which is used to identify nodes on the network.
+extern volatile uint8_t *IO_buttonDDR;   //This is only used by networked nodes.
+extern volatile uint8_t *IO_buttonPIN;
+extern volatile uint8_t IO_buttonPin;
+
+extern volatile uint8_t *IO_txrxPORT;  //Xceiver 
+extern volatile uint8_t *IO_txrxDDR;
+extern volatile uint8_t IO_txPin;
+extern volatile uint8_t IO_rxPin;
+
+extern volatile uint8_t *IO_txEnablePORT;
+extern volatile uint8_t *IO_txEnableDDR;
+extern volatile uint8_t IO_txEnablePin; //Transmit enable for RS485
+#endif
+
 //PRIVATE FUNCTIONS
 void setup();
 void loop();
@@ -58,6 +81,18 @@ void svcRequestURL();
 void svcSetIPAddress();
 void svcStatus();
 void svcResetNode();
+void svcBootloaderCommand();
+void bootloaderInit();
+void applicationStart();
+void svcBootloaderData();
+void writePage();
+void svcBootloaderReadPage();
+
+
+#ifdef standardGestalt
+//This is being compiled as an independent program, not using the arduino IDE.
+int main();
+#endif
 
 //PUBLIC FUNCTIONS
 void transmitPacket();

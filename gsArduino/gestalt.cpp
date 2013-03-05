@@ -15,7 +15,7 @@
 //  |---------|------------------------------------------|-------------------|-----------------------------|
 //  |01/18/13 | LIBRARY FOR ARDUINO UNO                  | ILAN E. MOYER     | gestalt.cpp		             |
 //  |---------|------------------------------------------|-------------------|-----------------------------|
-//  |02/28/13 | MODIFIED TO SUPPORT EXTERNAL IO DEF.     | ILAN E. MOYER     | gestalt.cpp                 |
+//  |02/28/13 | MODIFIED TO SUPPORT EXTERNAL IO DEF      | ILAN E. MOYER     | gestalt.cpp                 |
 //  --------------------------------------------------------------------------------------------------------
 //
 //  --ABOUT GESTALT-------------------------------------
@@ -36,7 +36,7 @@ extern "C"{
 #endif
 
 //--INCLUDES--
-#include "gestalt.h"
+#include <gestalt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -47,30 +47,31 @@ extern "C"{
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include <avr/wdt.h>
+#include <avr/delay.h>
+#include <avr/boot.h>
 
 //--DEFINE IO--
+// These values get initialized in setup()
+volatile uint8_t *IO_ledPORT; //The led which is used to identify nodes on the network.
+volatile uint8_t *IO_ledDDR;
+volatile uint8_t *IO_ledPIN;
+volatile uint8_t IO_ledPin;
 
+volatile uint8_t *IO_buttonPORT;  //The button which is used to identify nodes on the network.
+volatile uint8_t *IO_buttonDDR;   //This is only used by networked nodes.
+volatile uint8_t *IO_buttonPIN;
+volatile uint8_t IO_buttonPin;
 
+volatile uint8_t *IO_txrxPORT;  //Xceiver 
+volatile uint8_t *IO_txrxDDR;
+volatile uint8_t IO_txPin;
+volatile uint8_t IO_rxPin;
 
-#define UIPort			        PORTB
-#define UIDir								DDRB
-#define UIPin								PINB
-
-#define ledPin			5  //PB5
-
-#define UIDirInit		(1<<ledPin)
-#define UIPortInit	        0
-//--txrx--
-#define txrxPort		PORTD
-#define	txrxDir			DDRD
-#define	txrxPin			PIND
-
-#define rxPin				0  //PD0
-#define txPin				1  //PD1
-
-#define txrxDirInit		(1<<txPin)
-#define txrxPortInit	        (1<<rxPin)	//enable pullups on rxpin
-
+#ifdef standardGestalt
+volatile uint8_t *IO_txEnablePORT;
+volatile uint8_t *IO_txEnableDDR;
+volatile uint8_t IO_txEnablePin; //Transmit enable for RS485
+#endif
 
 
 //--DEFINE NODE VARIABLES--
@@ -78,10 +79,21 @@ uint8_t networkAddress[2];	//network address
 char defaultURL[] = "http://tq.mit.edu/gestalt/086-000.py";	//node URL
 char *url = 0;	//pointer to URL
 uint8_t urlLength = 0;	//stores current URL length
+
+//--EEPROM LOCATIONS--
 const uint8_t persistentIPAddress0 = 0;	//used for EEPROM storage of IP address
 const uint8_t persistentIPAddress1 = 1;      //note: changed from uint8_t* to int to use the arduino version of eeprom.read()
+const uint8_t applicationValidationByte = 2; //eeprom address for app valid byte
 
 const uint8_t applicationValid = 170; //0b10101010
+
+//--BOOTLOADER--
+#ifdef bootloader
+//--BOOTLOADER CONSTANTS--
+const uint8_t pageSize = 128; //length in bytes of each page
+//--BOOTLOADER STATE VARIABLES--
+uint16_t pageAddress;   //current page address for programming
+#endif
 
 // --DEFINE TRANCEIVER MEMORY--
 uint8_t txBuffer[255];  //transmitter buffer
@@ -112,11 +124,14 @@ const uint8_t multicast		  = 138; //start byte value for multicast packet
 const uint8_t basePacketLength			= 5; //[start, address1, address0, port, length, checksum]
 
 //--DEFINE PORTS----
-const uint8_t statusPort		= 1;
-const uint8_t urlPort				= 5;
-const uint8_t setIPPort			= 6;
-const uint8_t identifyPort	= 7;
-const uint8_t resetPort			= 255;
+const uint8_t statusPort		        = 1;
+const uint8_t bootloaderCommandPort = 2;
+const uint8_t bootloaderDataPort    = 3;
+const uint8_t bootloaderReadPort    = 4;
+const uint8_t urlPort				        = 5;
+const uint8_t setIPPort			        = 6;
+const uint8_t identifyPort	        = 7;
+const uint8_t resetPort			        = 255;
 
 //--DEFINE TRANCEIVER SETTINGS--
 const uint8_t watchdogTimeout = 1;  //timeout in units of timer2 - around 1ms with prescalar of 64 @ 16MHz
@@ -137,6 +152,10 @@ typedef struct {  //http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewto
 #define packetInboundFlag ((volatile PackedBool*)(&GPIOR0))->f6
 #define packetOutboundFlag ((volatile PackedBool*)(&GPIOR0))->f5
 
+#ifdef bootloader
+#define inPageLoad ((volatile PackedBool*)(&GPIOR0))->f4 //flag set when page load in progress
+#define inBootload ((volatile PackedBool*)(&GPIOR0))->f3  //flag set when bootload in progress
+#endif
 
 // CRC TABLE
 // -this gets placed in program memory rather than RAM
@@ -159,25 +178,68 @@ uint8_t crcTable[256] PROGMEM = {
   152, 159, 138, 141, 132, 131, 222, 217, 208, 215, 194, 197, 204, 203, 
   230, 225, 232, 239, 250, 253, 244, 243};
 
+#ifdef standardGestalt
+//This is being compiled as an independent program, not using the arduino IDE.
+int main(){
+  setup();
+  while(true){
+    loop();
+  }
+}
+#endif
+
+
+
+
 // -- FUNCTION: SETUP --
 // Basic functionality for communication with the PC is configured here.
 
 void setup(){
-	
+
 	//DISABLE SYSTEM WATCHDOG TIMER
   MCUSR = 0;
   wdt_disable();
-      
-  //INITIALIZE PINS
-	UIDir 		= UIDirInit;
-	UIPort 		= UIPortInit;
-	
-	txrxDir 	= txrxDirInit;
-	txrxPort 	= txrxPortInit;
+
+  //DEFINE DEFAULT PINS AND PORTS FOR ARDUINO
+  IO_ledPORT = &PORTB;
+  IO_ledDDR = &DDRB;
+  IO_ledPIN = &PINB;
+  IO_ledPin = 1<<5;
+
+  IO_txrxPORT = &PORTD;
+  IO_txrxDDR = &DDRD;
+  IO_txPin = 1<<1;
+  IO_rxPin = 1<<0;
+
+  //PIN AND PORT CONFIGURATION FOR UNITS OF FAB
+  #ifdef unitOfFab
+  IO_ledPORT = &PORTB;
+  IO_ledDDR = &DDRB;
+  IO_ledPIN = &PINB;
+  IO_ledPin = 1<<1;
+
+  IO_buttonPORT = &PORTB;
+  IO_buttonDDR = &DDRB;
+  IO_buttonPIN = &PINB;
+  IO_buttonPin = 1<<0;
+
+  IO_txrxPORT = &PORTD;
+  IO_txrxDDR = &DDRD;
+  IO_rxPin = 1<<0;
+  IO_txPin = 1<<1;
+
+  IO_txEnablePORT = &PORTA;
+  IO_txEnableDDR = &DDRA;
+  IO_txEnablePin = 1<<4;
+  #endif 
   
   
   //INITIALIZE USART
-  UBRR0 = 12;  //8 = 115.2kbps, 12 = 76.8kbps NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
+  #ifdef standardGestalt
+  UBRR0 = 9;  //9 = 115.2kbps, 14 = 76.8kbps @18.432MHz NOTE: standard gestalt nodes with a 18.432MHz clock communicate at 115.2kbps
+  #else
+  UBRR0 = 12;  //8 = 115.2kbps, 12 = 76.8kbps @16MHz NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
+  #endif
   UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(0<<UDRIE0)|(1<<RXCIE0)|(0<<TXCIE0);  //enable transmitter and receiver, rx interrupts
   UCSR0C = (0 << UMSEL00) | (0 << UPM00) | (0 << USBS0) | (3 <<UCSZ00);  //8 data bits, 1 stop bit, no parity
 
@@ -192,19 +254,46 @@ void setup(){
   networkAddress[0]=eeprom_read_byte((uint8_t*)persistentIPAddress0);
   networkAddress[1]=eeprom_read_byte((uint8_t*)persistentIPAddress1);
   
+  //BOOTLOADER SUPPORT
+  #if defined(bootloader) //positions interrupt vector table in boot space
+    MCUCR = (1<<IVCE);
+    MCUCR = (1<<IVSEL);
+  #elif defined(standardGestalt)
+    eeprom_update_byte((uint8_t*)applicationValidationByte, applicationValid);  //mark application code as valid  
+  #endif
+
   //SET DEFAULT URL
   setURL(&defaultURL[0], sizeof(defaultURL));
   
   //USER SETUP
   userSetup();		//This should be defined in the user program
   
+  //INITIALIZE PORTS AND PINS
+  *IO_ledDDR |= IO_ledPin;  //led pin is an output
+  *IO_ledPORT &= ~(IO_ledPin);   //led is initially off
+
+
+  *IO_txrxDDR |= IO_txPin; //tx pin is an output
+  *IO_txrxDDR &= ~(IO_rxPin);  //rx pin is an input
+
+  #ifdef standardGestalt
+  *IO_buttonDDR &= ~(IO_buttonPin);  //button pin as an input
+  *IO_txEnableDDR |= IO_txEnablePin;
+  *IO_txEnablePORT &= ~(IO_txEnablePin);
+  #endif
+
+
   //ENABLE GLOBAL INTERRUPTS
   sei();
 }
 
 //----RECEIVER CODE-------------------------------------
 //--RECEIVER INTERRUPT ROUTINE--
-ISR(USART_RX_vect){
+#if defined(gestalt324)
+ISR(USART0_RX_vect){  //atmega324
+#else
+ISR(USART_RX_vect){   //atmega328, default for arduino
+#endif
 	//enable watchdog
   TCNT2 = 0;  //clear timer2
   watchdogTime = 0; //clear watchdog value
@@ -253,7 +342,12 @@ ISR(TIMER2_OVF_vect){
 
 //------TRANSMITTER CODE----------------------------------------------
 //--TRANSMITTER INTERRUPT-------------
-ISR(USART_TX_vect){
+#ifdef gestalt324
+ISR(USART0_TX_vect){//atmega324
+#else
+ISR(USART_TX_vect){ 
+#endif
+
   UCSR0A = (1<<TXC0);  //writing 1 to this location clears any potential transmission completion flags
   UCSR0B = (1<<RXEN0)|(1<<TXCIE0)|(1<<TXEN0);  //switches interrupt mode to interrupt on transmission rather than data register empty
   packetOutboundFlag = true;  //set outgoing packet flag
@@ -272,13 +366,19 @@ ISR(USART_TX_vect){
       packetOutboundFlag = false;
       txPosition = 0;
       txPacketChecksum = 0;
+      #ifdef standardGestalt
+      *IO_txEnablePORT &= ~(IO_txEnablePin);  //enable transmit pin
+      #endif 
     }
   }  
 }
 
 //--ALIAS TO TRANSMITTER INTERRUPT--
+#ifdef gestalt324
+ISR(USART0_UDRE_vect, ISR_ALIASOF(USART0_TX_vect));
+#else
 ISR(USART_UDRE_vect, ISR_ALIASOF(USART_TX_vect));
-
+#endif
 
 //--START TRANSMISSION OF PACKET
 void transmitPacket(){
@@ -287,6 +387,9 @@ void transmitPacket(){
   txPacketLength = txBuffer[lengthLocation];  //load packet length
   txBuffer[addressLocation] = networkAddress[0];	//load network address into txBuffer
   txBuffer[addressLocation+1] = networkAddress[1];
+  #ifdef standardGestalt
+  *IO_txEnablePORT |= IO_txEnablePin;  //enable transmit pin
+  #endif
   UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<<UDRIE0);  //enables interrupts on data empty, which triggers the first transmission
 }
 
@@ -309,7 +412,7 @@ void transmitMulticastPacket(uint8_t port, uint8_t length ){
 
 
 void loop(){
-   packetRouter();
+  packetRouter();
 }
 
 
@@ -337,7 +440,19 @@ void packetRouter(){
 			case resetPort: //reset node
 				svcResetNode();
 				break;
-			
+
+      #if defined(bootloader) //these functions should only work if the bootloader is active
+      case bootloaderCommandPort: //bootloader command
+        svcBootloaderCommand();
+        break;
+      case bootloaderDataPort: //bootloader data
+        svcBootloaderData();
+        break;
+      case bootloaderReadPort: //bootloader read page
+        svcBootloaderReadPage();
+        break;
+      #endif
+
 			default: //try user program
 				userPacketRouter(destinationPort);
 				break;
@@ -350,15 +465,12 @@ void packetRouter(){
 //--IDENTIFY NODE--
 void svcIdentifyNode(){
 	uint32_t counter = 0;
-	UIPort |= _BV(ledPin);	//turn on LED
-	while(true){
-		counter++;
-		if (counter==5000000){
-      UIPort &= ~(_BV(ledPin));	//turn off LED
-			return;
-		}
+  *IO_ledPORT |= IO_ledPin;  //turn on LED
+	while(counter < 1500000){
+		_delay_us(1);
+    counter++;
 	}
-	UIPort &= ~(_BV(ledPin));	//turn off LED
+	*IO_ledPORT &= ~(IO_ledPin);	//turn off LED
 }
 
 //--REQUEST URL--
@@ -372,6 +484,37 @@ void svcRequestURL(){
 
 //--SET IP ADDRESS--
 void svcSetIPAddress(){
+  #ifdef standardGestalt
+  if (rxBuffer[startByteLocation] == multicast){ //wait for button press
+    volatile uint32_t counter = 0; //this variable for blinking
+    volatile uint8_t counter2 = 0; //this variable for escaping out of function
+    *IO_ledPORT |= IO_ledPin;  //turn on led
+    while(*IO_buttonPIN & IO_buttonPin){
+      counter++;
+      if (counter == 500000){  //blink frequency
+        *IO_ledPIN |= IO_ledPin; //strobe LED
+        counter2++;
+        counter = 0;
+      }
+      if ((counter2 == 15)||(packetReceivedFlag==true)){  //exit condition, n blinks or packet received (presumeably from other responding node)
+        *IO_ledPORT &= ~(IO_ledPin); //turn off LED
+        packetReceivedFlag = false;  //clear packet waiting flag
+        return;
+      }
+    }
+  }
+  networkAddress[0] = rxBuffer[payloadLocation];  //load new IP address
+  networkAddress[1] = rxBuffer[payloadLocation+1];
+  eeprom_update_byte((uint8_t*)persistentIPAddress0, networkAddress[0]);  //store IP address in eeprom
+  eeprom_update_byte((uint8_t*)persistentIPAddress1, networkAddress[1]);
+  uint8_t offset = 0;
+  for(offset = 0; offset<urlLength; offset++){  //transmit URL
+    txBuffer[payloadLocation+offset] = url[offset];
+  }
+  *IO_ledPORT &= ~(IO_ledPin); //turn off LED
+  transmitMulticastPacket(setIPPort, urlLength);
+  return;
+  #else
 	networkAddress[0] = rxBuffer[payloadLocation];	//load new IP address
 	networkAddress[1] = rxBuffer[payloadLocation+1];
 	eeprom_write_byte((uint8_t*)persistentIPAddress0, networkAddress[0]);	//store IP address in eeprom
@@ -382,12 +525,24 @@ void svcSetIPAddress(){
 	}
 //	UIPort &= ~(_BV(ledPin));	//turn off LED
 	transmitMulticastPacket(setIPPort, urlLength);
+  return;
+  #endif
 }	
 		
 
 //--STATUS REQUEST--
 void svcStatus(){
-   txBuffer[payloadLocation] = 65;	//send "A" to indicate application space program.
+
+  #if defined(bootloader)
+  txBuffer[payloadLocation] = 66;  //send "B" to indicate bootloader.
+  #else
+  txBuffer[payloadLocation] = 65; //send "A" to indicate application space program.
+  #endif
+
+  #ifdef standardGestalt
+  txBuffer[payloadLocation+1] = eeprom_read_byte((uint8_t*)applicationValidationByte); //send application validation byte
+  #endif
+
    transmitUnicastPacket(statusPort, 2);
 }
 
@@ -397,6 +552,114 @@ void svcResetNode(){
 	while(1){};
 	}
 
+//--BOOTLOADER FUNCTIONS--
+#ifdef bootloader
+void svcBootloaderCommand(){
+  uint8_t command = rxBuffer[payloadLocation];
+  txBuffer[startByteLocation] = unicast;
+  txBuffer[portLocation] = 2;
+  txBuffer[lengthLocation] = 8; //five header bytes, three payload bytes, and checksum
+  txBuffer[payloadLocation +1] = 0;
+  txBuffer[payloadLocation +2] = 0;
+  if (command == 0){
+    txBuffer[payloadLocation] = 5;  //response to indicate bootloader has been initialized
+    transmitPacket();
+    bootloaderInit();
+  }
+  if (command == 1){
+    txBuffer[payloadLocation] = 9; //response to indicate that application has been launched
+    transmitPacket();
+    applicationStart();
+  }
+}
+
+void bootloaderInit(){
+  inBootload = true;  //sets bootload flag
+  pageAddress = 0;  //resets page address
+  eeprom_update_byte((uint8_t*)applicationValidationByte, 0); //mark application code as invalid
+  }
+  
+void applicationStart(){
+  while (packetOutboundFlag == true){ //wait for response packet to be sent
+  }
+  
+  //CLEAR PROCESSOR STATE
+  cli();  //disable interrupts
+  UCSR0B = 0; //clear USART interrupt enables
+  TIMSK2 = 0; //clear timer2 interrupt enables
+
+  //shift interrupts to application space
+  MCUCR = (1<<IVCE);
+  MCUCR = (0<<IVSEL);
+  
+  asm("jmp 0000");  //jump to start of application space
+  
+}
+
+void svcBootloaderData(){
+  //TODO: add safety to prevent writing without an init
+  //      either check for address match internally, or allow writing to arbitrary pages
+  //      interlocks
+  txBuffer[startByteLocation] = unicast;
+  txBuffer[portLocation] = 3;
+  txBuffer[lengthLocation] = 8;
+  txBuffer[payloadLocation] = 1;  //indicate programming page now
+  txBuffer[payloadLocation+1] = (pageAddress & 0x00FF);
+  txBuffer[payloadLocation+2] = ((pageAddress & 0xFF00)>>8);
+  writePage();
+  transmitPacket();
+  }
+  
+void writePage(){   //note: code based on http://www.nongnu.org/avr-libc/user-manual/group_avr_boot.html
+                    //      and suggestions from Brad Schick's AVR Bootloader FAQ
+  
+  uint16_t i;
+  uint8_t sreg;
+//  uint8_t *bootData; 
+//  bootData = &rxBuffer[payloadLocation+3];  //start of boot data.
+  
+  //disable interrupts
+  sreg = SREG;  //store global interrupt flag state
+  cli();  //disable interrupts
+  
+  eeprom_busy_wait();
+  
+  boot_page_erase_safe(pageAddress);
+  boot_spm_busy_wait(); //wait for page to be erased
+  
+  for (i=0; i<pageSize; i+=2){
+    //set up little-endian word from data bytes
+    uint16_t w = rxBuffer[payloadLocation+3+i];
+    w += (rxBuffer[payloadLocation+4+i]) << 8;
+
+    boot_page_fill_safe(pageAddress + i, w);  //fill page
+  }
+  
+  boot_page_write_safe(pageAddress);  //store buffer in flash page
+  boot_spm_busy_wait(); //wait for memory to be written
+  
+  boot_rww_enable();
+  SREG = sreg;
+  
+  pageAddress+=pageSize;
+  }
+  
+void svcBootloaderReadPage(){ //returns page
+  txBuffer[startByteLocation] = unicast;
+  txBuffer[portLocation] = 4;
+  txBuffer[lengthLocation] = pageSize+5;
+  
+  uint16_t readAddress = rxBuffer[payloadLocation];
+  readAddress += (rxBuffer[payloadLocation+1])<<8;
+  
+  uint16_t i;
+  for (i=0; i<pageSize; i++){
+    txBuffer[payloadLocation+i] = pgm_read_byte(readAddress+i);
+  } 
+  transmitPacket();
+}
+
+#endif
 //------UTILITY FUNCTIONS---------------------	
 
 //--SET URL--

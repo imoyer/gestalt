@@ -254,6 +254,7 @@ class serialInterface(devInterface):
 				transmitState, transmitPacket = self.getTransmitPacket()
 				if transmitState:
 					if self.port:
+						print transmitPacket
 						self.port.write(serialize(transmitPacket))
 					else: notice(self, 'Cannot Transmit - No Serial Port Initialized')
 				time.sleep(0.0005)
