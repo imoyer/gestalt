@@ -5,10 +5,12 @@ import threading
 import time
 import os
 import urllib
+import math
 from gestalt.utilities import notice as notice
 from gestalt import interfaces
 from gestalt import functions
 from gestalt import packets
+from gestalt import utilities
 
 
 #----NODE SHELLS------------
@@ -618,11 +620,12 @@ class baseNetworkedGestaltNode(baseGestaltNode):
 			notice(self, "PAGE " + str(currentPageNumber) + " VERIFIED!")
 		notice(self, "VERIFY PASSED")
 		#start application
-		if not self.node.runApplication():
+		if not self.runApplication():
 			notice(self, "COULD NOT START APPLICATION")
 			return FALSE
 		#register new node with gestalt interface
-		self.target.nodeManager.assignNode(self)	#registers node with target			
+		#self.target.nodeManager.assignNode(self)	#registers node with target		
+		#need something here to import a new node into self.shell based on URL from node	
 		return True
 	
 	

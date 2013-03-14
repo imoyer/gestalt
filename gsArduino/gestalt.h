@@ -9,11 +9,13 @@
 //  |---------|------------------------------------------|-------------------|-----------------------------|
 //  |07/03/12 | CREATED                                  | ILAN E. MOYER     | gsArduino1.pde              |
 //  |---------|------------------------------------------|-------------------|-----------------------------|
-//  |07/29/12 | MODIFIED FOR UNITS OF FAB                | ILAN E. MOYER     | 086-001a.c	           			 |
+//  |07/29/12 | MODIFIED FOR UNITS OF FAB                | ILAN E. MOYER     | 086-001a.c	           	   |
 //  |---------|------------------------------------------|-------------------|-----------------------------|
 //  |01/13/13 | UPDATED FOR ARDUINO UNO                  | ILAN E. MOYER     | gsArduinoUno.ino            |
 //  |---------|------------------------------------------|-------------------|-----------------------------|
-//  |01/18/13 | LIBRARY FOR ARDUINO UNO                  | ILAN E. MOYER     | gestalt.h		 	             |
+//  |01/18/13 | LIBRARY FOR ARDUINO UNO                  | ILAN E. MOYER     | gestalt.h		 	       |
+//  |---------|------------------------------------------|-------------------|-----------------------------|
+//  |03/14/13 | ADDED USER LOOP.	                     | ILAN E. MOYER     | gestalt.h		 	       |
 //  --------------------------------------------------------------------------------------------------------
 //
 //  --ABOUT GESTALT-------------------------------------
@@ -99,6 +101,7 @@ void transmitPacket();
 void transmitUnicastPacket(uint8_t port, uint8_t length);
 void transmitMulticastPacket(uint8_t port, uint8_t length);
 void userSetup();
+void userLoop();
 void userPacketRouter(uint8_t destinationPort);
 void setURL(char *newURL, uint8_t newURLLength);
 

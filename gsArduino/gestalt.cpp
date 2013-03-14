@@ -16,6 +16,8 @@
 //  |01/18/13 | LIBRARY FOR ARDUINO UNO                  | ILAN E. MOYER     | gestalt.cpp		             |
 //  |---------|------------------------------------------|-------------------|-----------------------------|
 //  |02/28/13 | MODIFIED TO SUPPORT EXTERNAL IO DEF      | ILAN E. MOYER     | gestalt.cpp                 |
+//  |---------|------------------------------------------|-------------------|-----------------------------|
+//  |03/14/13 | ADDED USER LOOP.                         | ILAN E. MOYER     | gestalt.cpp                 |
 //  --------------------------------------------------------------------------------------------------------
 //
 //  --ABOUT GESTALT-------------------------------------
@@ -413,6 +415,7 @@ void transmitMulticastPacket(uint8_t port, uint8_t length ){
 
 void loop(){
   packetRouter();
+  userLoop();
 }
 
 

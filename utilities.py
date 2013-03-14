@@ -1,3 +1,5 @@
+import math
+
 def notice(source = None, message = ""):
 	''' Sends a notice to the user.
 	
