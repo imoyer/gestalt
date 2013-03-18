@@ -24,7 +24,7 @@
 //	Gestalt is a framework for automating physical hardware. The basic concept is that each unit of hardware,
 //	called a "node", has a matching python module called a "virtual node." Gestalt provides a means of connecting
 //	the physical node with the virtual node along with tools for creating both. This library is designed to assist
-// 	in programming nodes in C using the Arduino platform. 
+// 	in programming nodes in C, using the Arduino platform or an independent compiler.
 
 //	Gestalt also supports custom hardware with additional features beyond what is possible using stand-alone Arduino
 //	boards. These features include networking and synchronization across multiple nodes to create complex fabrication
@@ -69,7 +69,7 @@ volatile uint8_t *IO_txrxDDR;
 volatile uint8_t IO_txPin;
 volatile uint8_t IO_rxPin;
 
-#ifdef standardGestalt
+#ifdef networkedGestalt
 volatile uint8_t *IO_txEnablePORT;
 volatile uint8_t *IO_txEnableDDR;
 volatile uint8_t IO_txEnablePin; //Transmit enable for RS485
@@ -260,8 +260,8 @@ void setup(){
   #if defined(bootloader) //positions interrupt vector table in boot space
     MCUCR = (1<<IVCE);
     MCUCR = (1<<IVSEL);
-  #elif defined(standardGestalt)
-    eeprom_update_byte((uint8_t*)applicationValidationByte, applicationValid);  //mark application code as valid  
+  #else
+    eeprom_write_byte((uint8_t*)applicationValidationByte, applicationValid);  //mark application code as valid, changed from update to write for arduino compatibility 
   #endif
 
   //SET DEFAULT URL
@@ -278,7 +278,7 @@ void setup(){
   *IO_txrxDDR |= IO_txPin; //tx pin is an output
   *IO_txrxDDR &= ~(IO_rxPin);  //rx pin is an input
 
-  #ifdef standardGestalt
+  #ifdef networkedGestalt
   *IO_buttonDDR &= ~(IO_buttonPin);  //button pin as an input
   *IO_txEnableDDR |= IO_txEnablePin;
   *IO_txEnablePORT &= ~(IO_txEnablePin);
@@ -368,7 +368,7 @@ ISR(USART_TX_vect){
       packetOutboundFlag = false;
       txPosition = 0;
       txPacketChecksum = 0;
-      #ifdef standardGestalt
+      #ifdef networkedGestalt
       *IO_txEnablePORT &= ~(IO_txEnablePin);  //enable transmit pin
       #endif 
     }
@@ -389,7 +389,7 @@ void transmitPacket(){
   txPacketLength = txBuffer[lengthLocation];  //load packet length
   txBuffer[addressLocation] = networkAddress[0];	//load network address into txBuffer
   txBuffer[addressLocation+1] = networkAddress[1];
-  #ifdef standardGestalt
+  #ifdef networkedGestalt
   *IO_txEnablePORT |= IO_txEnablePin;  //enable transmit pin
   #endif
   UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<<UDRIE0);  //enables interrupts on data empty, which triggers the first transmission
@@ -487,7 +487,7 @@ void svcRequestURL(){
 
 //--SET IP ADDRESS--
 void svcSetIPAddress(){
-  #ifdef standardGestalt
+  #ifdef networkedGestalt
   if (rxBuffer[startByteLocation] == multicast){ //wait for button press
     volatile uint32_t counter = 0; //this variable for blinking
     volatile uint8_t counter2 = 0; //this variable for escaping out of function
@@ -542,9 +542,8 @@ void svcStatus(){
   txBuffer[payloadLocation] = 65; //send "A" to indicate application space program.
   #endif
 
-  #ifdef standardGestalt
   txBuffer[payloadLocation+1] = eeprom_read_byte((uint8_t*)applicationValidationByte); //send application validation byte
-  #endif
+
 
    transmitUnicastPacket(statusPort, 2);
 }

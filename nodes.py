@@ -158,88 +158,8 @@ class soloIndependentNode(baseNodeShell):
 
 class gestaltNodeShell(baseNodeShell):
 	'''Base class for all nodes which communicate using the gestalt protocol.'''
-	def __init__(self):
-		super(gestaltNodeShell, self).__init__()	#call init on baseNodeShell
-
-	def generateIPAddress(self):
-		'''Generates a random IP address.'''
-		while True:
-			IP = [random.randint(0,255), random.randint(0,255)]	
-			if self.interface.validateIP(IP): break	#checks with interface to make sure IP address isn't taken.
-		return IP
-
-class soloGestaltNode(gestaltNodeShell):
-	'''	A container shell for Solo/Gestalt nodes.
-	
-		Solo/Gestalt nodes are non-networked and use the gestalt communications protocol.
-		For example they might make use of the gsArduino library.'''
-
 	def __init__(self, name = None, interface = None, filename = None, URL = None, module = None, **kwargs):
-		'''	Initialization procedure for Solo/Independent Node Shell.
-			
-			name:		a unique name assigned by the user. This is used by the persistence algorithm to re-acquire the node.
-			interface: 	the object thru which the virtual node communicates with its physical counterpart.
-			**kwargs:	any additional arguments to be passed to the node during initialization
-			
-			Methods of Loading Virtual Node:
-				filename: an import-able module containing the virtual node.
-				URL: a URL pointing to a module as a resource containing the virtual node.
-				module: a python module name containing the virtual node.
-		
-			Solo/Gestalt virtual nodes initialize by first connecting to their interface and then requesting
-			a driver URL from the node. This driver is then loaded into the shell as the virtual node.
-		'''
-
-		#call base class __init__ method
-		super(soloGestaltNode, self).__init__()
-		
-		#assign parameters to variables
-		self.name = name
-		self.filename = filename
-		self.URL = URL
-		self.module = module
-		
-		#connect to interface
-		if interface:
-			if type(interface) != interfaces.gestaltInterface:
-				#wrap a gestalt interface around the provided interface
-				self.interface.set(interfaces.gestaltInterface(interface = interface, owner = self), self)
-			else: self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
-		else:
-			notice(self, 'Error - please provide an interface.')
-		#import base node
-		self.setNode(baseSoloGestaltNode())		
-		
-		#set node IP address	-- this will be changed later once persistence is added
-		IP = self.generateIPAddress()	#generate random IP address
-		self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
-		nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retreive URL
-		
-		#if a virtual node source is provided, use that. Otherwise acquire from URL provided by node.
-		if filename:
-			if not self.loadNodeFromFile(filename, **kwargs): return
-		#load via URL
-		elif URL:
-			if not self.loadNodeFromURL(URL, **kwargs): return
-		#load via module
-		elif module:
-			if not self.loadNodeFromModule(module, **kwargs): return
-		#get URL from node
-		else:
-			if not self.loadNodeFromURL(nodeURL): return
-			
-		#assign new node with old IP address to interface
-		self.interface.assignNode(self.node, IP)
-	
-		
-class networkedGestaltNode(gestaltNodeShell):
-	'''	A container shell for Networked/Gestalt nodes.
-	
-		Networked/Gestalt nodes are networked and use the gestalt communications protocol.
-		Both the older Fabnet hardware as well as boards based on Units of Fab are supported.'''
-
-	def __init__(self, name = None, interface = None, filename = None, URL = None, module = None, **kwargs):
-		'''	Initialization procedure for Solo/Independent Node Shell.
+		'''	Initialization procedure for Gestalt Node Shell.
 			
 			name:		a unique name assigned by the user. This is used by the persistence algorithm to re-acquire the node.
 			interface: 	the object thru which the virtual node communicates with its physical counterpart.
@@ -255,7 +175,7 @@ class networkedGestaltNode(gestaltNodeShell):
 		'''
 
 		#call base class __init__ method
-		super(networkedGestaltNode, self).__init__()
+		super(gestaltNodeShell, self).__init__()	#call init on baseNodeShell
 		
 		#assign parameters to variables
 		self.name = name
@@ -272,13 +192,13 @@ class networkedGestaltNode(gestaltNodeShell):
 		else:
 			notice(self, 'Error - please provide an interface.')
 		#import base node
-		self.setNode(baseNetworkedGestaltNode())		
+		self.setNode(baseStandardGestaltNode())		
 		
 		#set node IP address	-- this will be changed later once persistence is added
 		IP = self.generateIPAddress()	#generate random IP address
 		self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
+		if type(self) == 'gestalt.nodes.networkedGestaltNode': notice(self, "please identify me on the network.")
 		
-		notice(self, "please identify me on the network.")
 		nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retrieve URL. This goes away with persistence.
 		
 		notice(self, nodeURL)
@@ -292,8 +212,8 @@ class networkedGestaltNode(gestaltNodeShell):
 				notice(self, nodeURL)	#remove
 			else:
 				notice(self, "ERROR STARTING APPLICATION MODE")
-		elif nodeStatus == 'A': print notice(self, "RUNNING IN APPLICATION MODE")
-		else: print notice(self, " RUNNING IN BOOTLOADER MODE")		
+		elif nodeStatus == 'A': notice(self, "RUNNING IN APPLICATION MODE")
+		else: notice(self, " RUNNING IN BOOTLOADER MODE")		
 
 		#acquire virtual node.
 		#if a virtual node source is provided, use that. Otherwise acquire from URL provided by node.
@@ -311,6 +231,31 @@ class networkedGestaltNode(gestaltNodeShell):
 			
 		#assign new node with old IP address to interface
 		self.interface.assignNode(self.node, IP)
+
+
+	def generateIPAddress(self):
+		'''Generates a random IP address.'''
+		while True:
+			IP = [random.randint(0,255), random.randint(0,255)]	
+			if self.interface.validateIP(IP): break	#checks with interface to make sure IP address isn't taken.
+		return IP
+
+
+class soloGestaltNode(gestaltNodeShell):
+	'''	A container shell for Solo/Gestalt nodes.
+	
+		Solo/Gestalt nodes are non-networked and use the gestalt communications protocol.
+		For example they might make use of the gsArduino library.'''
+	pass
+	
+	
+class networkedGestaltNode(gestaltNodeShell):
+	'''	A container shell for Networked/Gestalt nodes.
+	
+		Networked/Gestalt nodes are networked and use the gestalt communications protocol.
+		Both the older Fabnet hardware as well as boards based on Units of Fab are supported.'''
+	pass
+
 		
 
 
@@ -420,103 +365,9 @@ class baseGestaltNode(baseVirtualNode):
 				inboundFunction.virtualNode = self.nodeInstance
 				inboundFunction.responseFlag = newResponseFlag	#creates a common response flag for outbound and inbound functions
 				inboundFunction.packetHolder = packetHolder #creates a common packet holder for outbound and inbound functions
-				
-class baseSoloGestaltNode(baseGestaltNode):
-		
-	def _initPackets(self):
-		#status
-		self.statusRequestPacket = packets.packet(template = [])
-		self.statusResponsePacket = packets.packet(template = [packets.pString('status', 1), #status is encoded as 'b' for bootloader, 'a' for app.
-																packets.pInteger('appValidity', 1)]) #app validity byte, gets set to 170 if app is valid
-		
-		#request URL
-		self.urlRequestPacket = packets.packet(template = [])
-		self.urlResponsePacket = packets.packet(template = [packets.pString('URL')])
-		
-		#set IP address
-		self.setIPRequestPacket = packets.packet(template = [packets.pList('setAddress',2)])
-		self.setIPResponsePacket = packets.packet(self.urlResponsePacket)
-		
-		#identify node
-		self.identifyRequestPacket = packets.packet(template = [])
-		
-		#reset node
-		self.resetRequestPacket = packets.packet(template = [])
-		
-	def _initPorts(self):
-		#status
-		self.bindPort(port = 1, outboundFunction = self.statusRequest, outboundPacket = self.statusRequestPacket,
-							inboundFunction = self.statusResponse, inboundPacket = self.statusResponsePacket)
-
-		#request url
-		self.bindPort(port = 5, outboundFunction = self.urlRequest, outboundPacket = self.urlRequestPacket,
-							inboundFunction = self.urlResponse, inboundPacket = self.urlResponsePacket)
-		#set IP address
-		self.bindPort(port = 6, outboundFunction = self.setIPRequest, outboundPacket = self.setIPRequestPacket,
-							inboundFunction = self.setIPResponse, inboundPacket = self.setIPResponsePacket)
-		#identify node
-		self.bindPort(port = 7, outboundFunction = self.identifyRequest, outboundPacket = self.identifyRequestPacket)
-	
-		#reset node
-		self.bindPort(port = 255, outboundFunction = self.resetRequest, outboundPacket = self.resetRequestPacket)
-	
-	#Functions
-	class statusRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
-			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')
-				if self.waitForResponse(0.2):
-					return self.getPacket()['status'], (self.getPacket()['appValidity'] == 170) #magic number for app validity
-		
-	class statusResponse(functions.gFunction):
-		pass
-	
-	class urlRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
-			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')	#sends packet unicast	
-				if self.waitForResponse(0.2):
-					return self.getPacket()['URL']
-				else:
-					print "TIMEOUT WAITING FOR BUTTON PRESS"
-					return False
-											
-	class urlResponse(functions.gFunction):
-		pass
-	
-	
-	class setIPRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
-			def init(self, IP):
-				self.updatePacketSet({'setAddress':IP})
-				self.transmit('multicast')
-				if self.waitForResponse(1):
-					time.sleep(1)	#debounce for button press
-					return self.getPacket()['URL']
-				else:
-					print "TIMEOUT WAITING FOR BUTTON PRESS"
-				
-	class setIPResponse(functions.gFunction):
-		pass
-
-	class identifyRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
-			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')	#sends packet multicast
-				time.sleep(4)	#roughly the time that the LED is on.	
-				
-	class resetRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
-			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')
-				time.sleep(0.1)	#give time for watchdog timer to reset	
 
 
-class baseNetworkedGestaltNode(baseGestaltNode):
+class baseStandardGestaltNode(baseGestaltNode):
 	
 	def _initParameters(self):
 		self.bootPageSize = 128
