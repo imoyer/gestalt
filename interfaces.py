@@ -64,7 +64,7 @@ class socketUDPServer(socketInterface):
 #		self.transmitSocket.sendto(data, (remoteIPAddress, remoteIPPort))
 		self.receiveSocket.sendto(data, (remoteIPAddress, remoteIPPort))
 		
-	
+
 class devInterface(baseInterface):
 	''' Base class for interfaces mounted in the /dev/ folder.'''
 	def deviceScan(self, searchTerm):
