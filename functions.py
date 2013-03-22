@@ -1,13 +1,38 @@
+# gestalt.functions
+#
+# Contains the basic elements for building Gestalt functions.
+
 #----IMPORTS------------
 from gestalt.machines import coordinates
 from gestalt import utilities
+from gestalt import core
 #----FUNCTIONS--------------
-#
-# A Gestalt class for building methods for Gestalt
 
-class gFunction(object):
+class serviceRoutine(object):
+	'''A function which spawns an action item that will eventually be executed on the network.
+	
+		The expected pattern is as follows:
+		1) A call to serviceRoutine causes an actionObject to be created.
+		2) This actionObject eventually gets access to the network.
+		3) actionObject transmits a packet to its physical counterpart.
+		4) When a response arrives, it is routed by the virtual node to the response serviceRoutine.
+		5) Response service routine calls its receive method.
+		6) Receive method might update machine state, etc.
+		7) Receive method sets the responseFlag, signaling to the actionObject that a response has arrived.
+		8) actionObject reacts to message, either by returning something to the calling method, transmitting another packet, etc...
+		
+		Note that because only action object has access to the network at a time, it will block in the channelAccessQueue until a response is received.
+		However because serviceRoutine is running in the interface receiver routing queue, it can asynchronously update the machine state.
+	'''
+	def __init__(self, virtualNode = None, packet = None, responseFlag = None, packetHolder = None):
+		'''Service routines are instantiated by nodes.baseGestaltNode.bindPort.'''
+		self.virtualNode = virtualNode	#reference to owning virtual node
+		self.packet = packet	#reference to packt format
+		self.responseFlag = responseFlag	#responseFlag is shared between serviceRoutine and actionObject
+		self.packetHolder = packetHolder	#will contain an inbound packet for transfer between the serviceRoutine and the actionObject	
+	
 	def __call__(self, *args, **kwargs):
-		return self.gFunctionCore(self)._init(*args, **kwargs)	#allows gFunctionObject to return, gFunctionCore is defined by the user
+		return self.actionObject(self)._init(*args, **kwargs)	#allows gFunctionObject to return, gFunctionCore is defined by the user
 	
 	def receiver(self, packet):
 		decodedPacket = self.packet.decode(packet)
@@ -15,53 +40,9 @@ class gFunction(object):
 		self.receive(decodedPacket)
 		
 	def receive(self, packet):	#this should get overridden
-		self.responseFlag.set()
+		self.responseFlag.set()  #by default, all it does is set the response flag.
+	
 
-class gFunctionObject(object):
-	def __init__(self, gFunc):
-		self.gFunction = gFunc
-		self.packetSet = [] #initialize with an empty packet set
-		self.virtualNode = self.gFunction.virtualNode
-		
-	def _init(self, *args, **kwargs):
-		returnObject = self.init(*args, **kwargs) #run user init function
-		if returnObject != None: return returnObject
-		else: return self
-		
-	def updatePacketSet(self, updateInput):
-		self.packetSet = self.gFunction.packetSet(updateInput)
-	
-	def getPacketSet(self):
-		return self.packetSet
-	
-	def getPort(self):
-		return self.virtualNode.bindPort.outPorts[self.gFunction]
-	
-	def transmit(self, mode = 'unicast'):
-		self.gFunction.responseFlag.clear()	#clears flag, in case it wasn't cleared by a responding function
-		self.virtualNode.transmit([self], mode)	#transmit 
-	
-	def waitForResponse(self, timeout = None):
-		if self.gFunction.responseFlag.wait(timeout):
-			self.gFunction.responseFlag.clear()
-			return True
-		return False
-	
-	def getPacket(self):
-		return self.gFunction.packetHolder.get()
-		
-	
-	def init(self):
-		pass
-	def sync(self):
-		pass
-	def calculate(self):
-		pass
-	def commit(self):
-		pass
-	def callback(self):
-		pass
-	
 class move(object):
 	def __init__(self, virtualMachine = None, virtualNodes = None, axes = None, kinematics = None, machinePosition = None):
 		'''Configures the move object.'''

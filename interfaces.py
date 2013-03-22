@@ -336,8 +336,8 @@ class gestaltInterface(baseInterface):
 		'''Assigns a given node to the interface on a particular address.'''
 		self.nodeManager.updateNodesAddresses(node, address)
 	
-	def transmit(self, nodeSet, mode = 'unicast'):
-		'''Transmits a packet set over the interface.'''
+	def transmit(self, virtualNode, port, packetSet, mode):
+		'''Transmits a packet set over the interface immediately.'''
 		#--BUILD START BYTE TABLE--
 		startByteTable = {'unicast': 72, 'multicast': 138}	#unicast transmits to addressed node, multicast to all nodes on network
 		if mode in startByteTable:
@@ -346,15 +346,11 @@ class gestaltInterface(baseInterface):
 			startByte = startByteTable['unicast']
 
 		#--TRANSMIT PACKETS--
-		#//FIX// doesn't yet support synchrony
-		for functionCore in nodeSet:	#iterate over nodes in the nodeSet
-			packetSet = functionCore.getPacketSet()	#get packetSet from command object
-			port = functionCore.getPort()
-			address = self.nodeManager.getIP(functionCore.virtualNode)
-			for packet in packetSet:
-				packetRoutable = self.gestaltPacket({'startByte':startByte, 'address': address, 'port':port, 'payload':packet})	#build packet
-				packetWChecksum = self.CRC(packetRoutable)	#generate CRC
-				self.interface.transmit(packetWChecksum)	#transmit packet thru interface
+		address = self.nodeManager.getIP(virtualNode)
+		for packet in packetSet:
+			packetRoutable = self.gestaltPacket({'startByte':startByte, 'address': address, 'port':port, 'payload':packet})	#build packet
+			packetWChecksum = self.CRC(packetRoutable)	#generate CRC
+			self.interface.transmit(packetWChecksum)	#transmit packet thru interface
 		
 	def startReceiver(self):
 		'''Initiates the receiver thread.'''
@@ -367,6 +363,7 @@ class gestaltInterface(baseInterface):
 		self.packetRouter.start()		
 
 	class receiveThread(threading.Thread):
+		'''Gets packets from the network interface, interpreting them, and pushing them to the router queue.'''
 		def __init__(self, interface):
 			threading.Thread.__init__(self)
 			self.interface = interface
@@ -412,6 +409,7 @@ class gestaltInterface(baseInterface):
 				time.sleep(0.0005)
 		
 	class packetRouterThread(threading.Thread):
+		'''Routes packets to their matching service routines, and executes the service routine within this thread.'''
 		def __init__(self, interface):
 			threading.Thread.__init__(self)
 			self.interface = interface
@@ -439,7 +437,39 @@ class gestaltInterface(baseInterface):
 				return True, self.routerQueue.get()
 			except:
 				return False, None
+
+	class channelAccessThread(threading.Thread):
+		'''Controls when action objects have access to the interface.
 		
+			channelAccessQueue contains a serialized list of actionObjects which have been cleared for transmission and
+			are waiting for access to the channel.'''
+		
+		def __init__(self, interface):
+			threading.Thread.__init__(self)
+			self.interface = interface
+			self.channelAccessQueue = Queue.Queue()
+			#might add another queue here for when actionObjects need to be transmitted immediately.
+		
+		def run(self):
+			while True:
+				accessQueueState, actionObject = self.getActionObject()	#get the next action object from the queue.
+				if accessQueueState:
+					actionObject.channelAccess()	#actionObject now has control of the channel.
+				time.sleep(0.0005)
+
+		def getActionObject(self):
+			try:
+				return True, self.channelAccessQueue.get()
+			except:
+				return False, None
+	
+		def putActionObject(self, actionObject):
+			self.channelAccessQueue.put(actionObject)
+			return True
+	
+	class channelPriorityThread(threading.Thread):
+		'''Releases actionObjects to the channelAccessQueue, and when necessary first serializes actionSets into a series of action objects.'''		
+
 #----UTILITY CLASSES---------------
 class CRC():
 	'''Generates CRC bytes and checks CRC validated packets.'''

@@ -338,8 +338,8 @@ class baseGestaltNode(baseVirtualNode):
 	
 	
 	class bindPort():
-		def __init__(self, nodeInstance):
-			self.nodeInstance = nodeInstance
+		def __init__(self, virtualNode):
+			self.virtualNode = virtualNode
 			self.outPorts = {}	#ports for outbound packets {function:port#}
 			self.inPorts = {}	#functions for inbound packets {port#:function}
 
@@ -349,22 +349,25 @@ class baseGestaltNode(baseVirtualNode):
 			
 			#---CREATE FUNCTION INSTANCES AND UPDATE ROUTE DICTIONARIES---				
 			if outboundFunction:
-				if type(outboundFunction) == type: setattr(self.nodeInstance, outboundFunction.__name__, outboundFunction())	#create function instance
-				outboundFunction = getattr(self.nodeInstance, outboundFunction.__name__)	#update in event that new instance was created
+				if outboundPacket: packetSet = packets.packetSet(outboundPacket)	#use provided outbound packet
+				else: packetSet = packets.packetSet(packets.packet(template=[]))	#create default blank packet (this will save so much typing!)
+				if type(outboundFunction) == type: setattr(self.virtualNode, outboundFunction.__name__, outboundFunction(virtualNode = self.virtualNode, 	#create function instance
+																														packet = packetSet,	#define packet format
+																														responseFlag = newResponseFlag,	#creates a common response flag for outbound and inbound functions
+																														packetHolder = packetHolder)) #creates a common packet holder for outbound and inbound functions
+				outboundFunction = getattr(self.virtualNode, outboundFunction.__name__)	#update outboundFuncton pointer in event that new instance was created
 				self.outPorts.update({outboundFunction:port})	#bind port to outbound instance
-				outboundFunction.packetSet = packets.packetSet(outboundPacket)
-				outboundFunction.virtualNode = self.nodeInstance
-				outboundFunction.responseFlag = newResponseFlag	#creates a common response flag for outbound and inbound functions
-				outboundFunction.packetHolder = packetHolder #creates a common packet holder for outbound and inbound functions
 				
 			if inboundFunction:
-				if type(inboundFunction) == type: setattr(self.nodeInstance, inboundFunction.__name__, inboundFunction())	#create function instance
+				if inboundPacket: packetSet = packets.packetSet(inboundPacket)	#use provided inbound packet
+				else: packetSet = packets.packetSet(packets.packet(template=[])) #create default blank packet
+				if type(inboundFunction) == type: setattr(self.nodeInstance, inboundFunction.__name__, inboundFunction(virtualNode = self.virtualNode,	#create function instance
+																														packet = packetSet,	#define packet format
+																														responseFlag = newResponseFlag,	#creates a common response flag for outbound and inbound functions
+																														packetHolder = packetHolder)) #creates a common packet holder for outbound and inbound functions
 				inboundFunction = getattr(self.nodeInstance, inboundFunction.__name__)
 				self.inPorts.update({port:inboundFunction})	#bind port to inbound instance
-				inboundFunction.packet = inboundPacket
-				inboundFunction.virtualNode = self.nodeInstance
-				inboundFunction.responseFlag = newResponseFlag	#creates a common response flag for outbound and inbound functions
-				inboundFunction.packetHolder = packetHolder #creates a common packet holder for outbound and inbound functions
+
 
 
 class baseStandardGestaltNode(baseGestaltNode):
