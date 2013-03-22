@@ -11,6 +11,7 @@ from gestalt import interfaces
 from gestalt import functions
 from gestalt import packets
 from gestalt import utilities
+from gestalt import core
 
 
 #----NODE SHELLS------------
@@ -348,25 +349,31 @@ class baseGestaltNode(baseVirtualNode):
 			packetHolder = packets.packetHolder()
 			
 			#---CREATE FUNCTION INSTANCES AND UPDATE ROUTE DICTIONARIES---				
-			if outboundFunction:
-				if outboundPacket: packetSet = packets.packetSet(outboundPacket)	#use provided outbound packet
-				else: packetSet = packets.packetSet(packets.packet(template=[]))	#create default blank packet (this will save so much typing!)
+			if outboundFunction != None:
+				if outboundPacket != None: packetSet = packets.packetSet(outboundPacket)	#gives the outbound function a packetSet initialized with the provided packet as a template
+				else: packetSet = packets.packetSet(packets.packet(template=[]))	#gives the outbound function a packetSet initialized with a blank packet as a template
 				if type(outboundFunction) == type: setattr(self.virtualNode, outboundFunction.__name__, outboundFunction(virtualNode = self.virtualNode, 	#create function instance
-																														packet = packetSet,	#define packet format
+																														packetSet = packetSet,	#define packet format
 																														responseFlag = newResponseFlag,	#creates a common response flag for outbound and inbound functions
 																														packetHolder = packetHolder)) #creates a common packet holder for outbound and inbound functions
 				outboundFunction = getattr(self.virtualNode, outboundFunction.__name__)	#update outboundFuncton pointer in event that new instance was created
 				self.outPorts.update({outboundFunction:port})	#bind port to outbound instance
 				
-			if inboundFunction:
-				if inboundPacket: packetSet = packets.packetSet(inboundPacket)	#use provided inbound packet
-				else: packetSet = packets.packetSet(packets.packet(template=[])) #create default blank packet
-				if type(inboundFunction) == type: setattr(self.nodeInstance, inboundFunction.__name__, inboundFunction(virtualNode = self.virtualNode,	#create function instance
-																														packet = packetSet,	#define packet format
+			if inboundFunction != None:
+				if inboundPacket != None: packetSet = packets.packetSet(inboundPacket)	#gives the inbound function a packetSet initialized with the provided packet as a template
+				else: packetSet = packets.packetSet(packets.packet(template=[])) #gives the inbound function a packetSet initialized with a blank packet as a template
+				if type(inboundFunction) == type: setattr(self.virtualNode, inboundFunction.__name__, inboundFunction(virtualNode = self.virtualNode,	#create function instance
+																														packetSet = packetSet,	#define packet format
 																														responseFlag = newResponseFlag,	#creates a common response flag for outbound and inbound functions
 																														packetHolder = packetHolder)) #creates a common packet holder for outbound and inbound functions
-				inboundFunction = getattr(self.nodeInstance, inboundFunction.__name__)
+				inboundFunction = getattr(self.virtualNode, inboundFunction.__name__)
 				self.inPorts.update({port:inboundFunction})	#bind port to inbound instance
+			else:	#create a default inbound function which will handle incoming packets.
+				if inboundPacket != None: packetSet = packets.packetSet(inboundPacket)	#use provided inbound packet
+				else: packetSet = packets.packetSet(packets.packet(template=[])) #create default blank packet
+				inboundFunction = functions.serviceRoutine(virtualNode = self.virtualNode, packetSet = packetSet,
+															responseFlag = newResponseFlag, packetHolder = packetHolder)
+				self.inPorts.update({port:inboundFunction})
 
 
 
@@ -377,7 +384,6 @@ class baseStandardGestaltNode(baseGestaltNode):
 
 	def _initPackets(self):
 		#status
-		self.statusRequestPacket = packets.packet(template = [])
 		self.statusResponsePacket = packets.packet(template = [packets.pString('status', 1), #status is encoded as 'b' for bootloader, 'a' for app.
 																packets.pInteger('appValidity', 1)]) #app validity byte, gets set to 170 if app is valid
 		
@@ -396,7 +402,6 @@ class baseStandardGestaltNode(baseGestaltNode):
 		self.bootReadResponsePacket = packets.packet(template = [packets.pList('readData', self.bootPageSize)])
 		
 		#request URL
-		self.urlRequestPacket = packets.packet(template = [])
 		self.urlResponsePacket = packets.packet(template = [packets.pString('URL')])
 		
 		#set IP address
@@ -404,35 +409,33 @@ class baseStandardGestaltNode(baseGestaltNode):
 		self.setIPResponsePacket = packets.packet(self.urlResponsePacket)
 		
 		#identify node
-		self.identifyRequestPacket = packets.packet(template = [])
+		#no packet format
 		
 		#reset node
-		self.resetRequestPacket = packets.packet(template = [])
+		#no packet format
 		
 	def _initPorts(self):
 		#status
-		self.bindPort(port = 1, outboundFunction = self.statusRequest, outboundPacket = self.statusRequestPacket,
-							inboundFunction = self.statusResponse, inboundPacket = self.statusResponsePacket)
+		self.bindPort(port = 1, outboundFunction = self.statusRequest, inboundPacket = self.statusResponsePacket)
 		#bootloader command
 		self.bindPort(port = 2, outboundFunction = self.bootCommandRequest, outboundPacket = self.bootCommandRequestPacket,
-							inboundFunction = self.bootCommandResponse, inboundPacket = self.bootCommandResponsePacket)
+							inboundPacket = self.bootCommandResponsePacket)
 		#bootloader write
 		self.bindPort(port = 3, outboundFunction = self.bootWriteRequest, outboundPacket = self.bootWriteRequestPacket,
-							inboundFunction = self.bootWriteResponse, inboundPacket = self.bootWriteResponsePacket)
+							inboundPacket = self.bootWriteResponsePacket)
 		#bootloader read
 		self.bindPort(port = 4, outboundFunction = self.bootReadRequest, outboundPacket = self.bootReadRequestPacket,
-							inboundFunction = self.bootReadResponse, inboundPacket = self.bootReadResponsePacket)
+							inboundPacket = self.bootReadResponsePacket)
 		#request url
-		self.bindPort(port = 5, outboundFunction = self.urlRequest, outboundPacket = self.urlRequestPacket,
-							inboundFunction = self.urlResponse, inboundPacket = self.urlResponsePacket)
+		self.bindPort(port = 5, outboundFunction = self.urlRequest, inboundPacket = self.urlResponsePacket)
 		#set IP address
 		self.bindPort(port = 6, outboundFunction = self.setIPRequest, outboundPacket = self.setIPRequestPacket,
-							inboundFunction = self.setIPResponse, inboundPacket = self.setIPResponsePacket)
+							inboundPacket = self.setIPResponsePacket)
 		#identify node
-		self.bindPort(port = 7, outboundFunction = self.identifyRequest, outboundPacket = self.identifyRequestPacket)
+		self.bindPort(port = 7, outboundFunction = self.identifyRequest)
 	
 		#reset node
-		self.bindPort(port = 255, outboundFunction = self.resetRequest, outboundPacket = self.resetRequestPacket)
+		self.bindPort(port = 255, outboundFunction = self.resetRequest)
 	
 
 	def loadProgram(self, filename):
@@ -490,26 +493,26 @@ class baseStandardGestaltNode(baseGestaltNode):
 	def runApplication(self):
 		return self.bootCommandRequest('startApplication')
 	
-	class statusRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
-			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')
-				if self.waitForResponse(0.2):
-					return self.getPacket()['status'], (self.getPacket()['appValidity'] == 170) #magic number for app validity
-		
-	class statusResponse(functions.gFunction):
-		pass
 	
-	class bootCommandRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class statusRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
+			def init(self):
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess()	#wait for channel access
+				if self.transmitPersistent():
+					return self.getPacket()['status'], (self.getPacket()['appValidity'] == 170) #magic number for app validity
+
+
+	class bootCommandRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self, command):
 				commandSet = {'startBootload': 0, 'startApplication': 1}
 				responseSet = {'bootloadStarted':5, 'applicationStarted':9 }	#these numbers are arbitrary and defined in the firmware.
 				if command in commandSet:
-					self.updatePacketSet({'commandCode':commandSet[command]})
-					self.transmit('unicast')	#sends packet unicast
-					if self.waitForResponse(0.2):
+					self.setPacket({'commandCode':commandSet[command]})
+					self.commitAndRelease()	#commit self immediately
+					self.waitForChannelAccess()
+					if self.transmitPersistent():
 						responseCode = self.getPacket()['responseCode']
 						if command == 'startBootload' and responseCode == responseSet['bootloadStarted']: return True
 						if command == 'startAplication' and responseCode == responseSet['applicationStarted']: return True
@@ -519,18 +522,15 @@ class baseStandardGestaltNode(baseGestaltNode):
 				else:
 					print "BOOTLOADER COMMAND " + command + " NOT RECOGNIZED."
 					return False
-					
-				
-	
-	class bootCommandResponse(functions.gFunction):
-		pass
+
 			
-	class bootWriteRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class bootWriteRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self, pageNumber, data):
-				self.updatePacketSet({'commandCode': 2, 'pageNumber': pageNumber, 'writeData': data})
-				self.transmit('unicast')
-				if self.waitForResponse(0.2):
+				self.setPacket({'commandCode': 2, 'pageNumber': pageNumber, 'writeData': data})
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess()
+				if self.transmitPersistent():
 					returnPacket = self.getPacket()
 					if returnPacket['responseCode']==1:	#page write OK
 						return returnPacket['pageNumber']
@@ -541,63 +541,56 @@ class baseStandardGestaltNode(baseGestaltNode):
 					print "NO RESPONSE RECEIVED TO PAGE WRITE REQUEST"
 					return False
 	
-	class bootWriteResponse(functions.gFunction):
-		pass
 	
-	class bootReadRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class bootReadRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self, pageNumber):
-				self.updatePacketSet({'pageNumber': pageNumber})
-				self.transmit('unicast')
-				if self.waitForResponse(0.2):
+				self.setPacket({'pageNumber': pageNumber})
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess()
+				if self.transmitPersistent():
 					return self.getPacket()['readData']
 				else:
 					print "NO RESPONSE RECEIVED TO PAGE WRITE REQUEST"
 					return False
-				
+
 	
-	class bootReadResponse(functions.gFunction):
-		pass
-	
-	class urlRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class urlRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')	#sends packet unicast	
-				if self.waitForResponse(0.2):
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess()
+				if self.transmitPersistent():
 					return self.getPacket()['URL']
 				else:
-					print "TIMEOUT WAITING FOR BUTTON PRESS"
+					notice(self.virtualNode, 'NO URL RECEIVED')
 					return False
-											
-	class urlResponse(functions.gFunction):
-		pass
 	
 	
-	class setIPRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class setIPRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self, IP):
-				self.updatePacketSet({'setAddress':IP})
-				self.transmit('multicast')
-				if self.waitForResponse(15):
+				self.setPacket({'setAddress':IP}, mode = 'multicast')
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess(5)
+				if self.transmitPersistent(timeout = 15):
 					time.sleep(1)	#debounce for button press
 					return self.getPacket()['URL']
 				else:
-					print "TIMEOUT WAITING FOR BUTTON PRESS"
-				
-	class setIPResponse(functions.gFunction):
-		pass
+					notice(self.virtualNode, 'TIMEOUT WAITING FOR BUTTON PRESS')
 
-	class identifyRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class identifyRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')	#sends packet multicast
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess()
+				self.transmit()
 				time.sleep(4)	#roughly the time that the LED is on.	
 				
-	class resetRequest(functions.gFunction):
-		class gFunctionCore(functions.gFunctionObject):
+	class resetRequest(functions.serviceRoutine):
+		class actionObject(core.actionObject):
 			def init(self):
-				self.updatePacketSet({})
-				self.transmit('unicast')
+				self.commitAndRelease()	#commit self immediately
+				self.waitForChannelAccess()
+				self.transmit()
 				time.sleep(0.1)	#give time for watchdog timer to reset

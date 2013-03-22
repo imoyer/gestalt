@@ -24,10 +24,11 @@ class serviceRoutine(object):
 		Note that because only action object has access to the network at a time, it will block in the channelAccessQueue until a response is received.
 		However because serviceRoutine is running in the interface receiver routing queue, it can asynchronously update the machine state.
 	'''
-	def __init__(self, virtualNode = None, packet = None, responseFlag = None, packetHolder = None):
+	def __init__(self, virtualNode = None, packetSet = None, responseFlag = None, packetHolder = None):
 		'''Service routines are instantiated by nodes.baseGestaltNode.bindPort.'''
 		self.virtualNode = virtualNode	#reference to owning virtual node
-		self.packet = packet	#reference to packt format
+		self.packetSet = packetSet	#The packet encoder
+		self.packet = packetSet.Packet #a reference to the packet format for decoding purposes
 		self.responseFlag = responseFlag	#responseFlag is shared between serviceRoutine and actionObject
 		self.packetHolder = packetHolder	#will contain an inbound packet for transfer between the serviceRoutine and the actionObject	
 	

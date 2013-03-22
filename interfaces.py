@@ -10,6 +10,7 @@ import socket
 from gestalt.utilities import notice
 from gestalt import packets
 from gestalt import functions
+from gestalt import core
 
 
 #----INTERFACE CLASSES------------
@@ -289,7 +290,7 @@ class gestaltInterface(baseInterface):
 		self.CRC = CRC()
 		self.nodeManager = self.nodeManager()	#used to map network addresses (physical devices) to nodes
 		
-		self.startReceiver()
+		self.startInterfaceThreads()	#this will start the receiver, packetRouter, channelPriority, and channelAccess threads.
 		
 		#define standard gestalt packet
 		self.gestaltPacket = packets.packet(template = [	packets.pInteger('startByte', 1),
@@ -351,16 +352,30 @@ class gestaltInterface(baseInterface):
 			packetRoutable = self.gestaltPacket({'startByte':startByte, 'address': address, 'port':port, 'payload':packet})	#build packet
 			packetWChecksum = self.CRC(packetRoutable)	#generate CRC
 			self.interface.transmit(packetWChecksum)	#transmit packet thru interface
+	
+	def commit(self, actionObject):
+		'''Puts actionObjects or actionSets into the channelPriority queue.'''
+		self.channelPriority.putActionObject(actionObject)
 		
-	def startReceiver(self):
+	def startInterfaceThreads(self):
 		'''Initiates the receiver thread.'''
 		#START RECEIVE THREAD
 		self.receiver = self.receiveThread(self)
 		self.receiver.daemon = True
 		self.receiver.start()
+		#START ROUTER THREAD
 		self.packetRouter = self.packetRouterThread(self)
 		self.packetRouter.daemon = True
 		self.packetRouter.start()		
+		#START CHANNEL PRIORITY THREAD
+		self.channelPriority = self.channelPriorityThread(self)
+		self.channelPriority.daemon = True
+		self.channelPriority.start()
+		#START CHANNEL ACCESS THREAD
+		self.channelAccess = self.channelAccessThread(self)
+		self.channelAccess.daemon = True
+		self.channelAccess.start()
+
 
 	class receiveThread(threading.Thread):
 		'''Gets packets from the network interface, interpreting them, and pushing them to the router queue.'''
@@ -414,7 +429,6 @@ class gestaltInterface(baseInterface):
 			threading.Thread.__init__(self)
 			self.interface = interface
 			self.routerQueue = Queue.Queue()
-#			print "GESTALT INTERFACE PACKET ROUTER THREAD INITIALIZED"
 		
 		def run(self):
 			while True:
@@ -454,7 +468,7 @@ class gestaltInterface(baseInterface):
 			while True:
 				accessQueueState, actionObject = self.getActionObject()	#get the next action object from the queue.
 				if accessQueueState:
-					actionObject.channelAccess()	#actionObject now has control of the channel.
+					actionObject.grantAccess()	#actionObject now has control of the channel.
 				time.sleep(0.0005)
 
 		def getActionObject(self):
@@ -468,8 +482,39 @@ class gestaltInterface(baseInterface):
 			return True
 	
 	class channelPriorityThread(threading.Thread):
-		'''Releases actionObjects to the channelAccessQueue, and when necessary first serializes actionSets into a series of action objects.'''		
+		'''Releases actionObjects to the channelAccessQueue, and when necessary first serializes actionSets into a series of action objects.'''
+		
+		def __init__(self, interface):
+			threading.Thread.__init__(self)
+			self.interface = interface
+			self.channelPriorityQueue = Queue.Queue()
+			
+		def run(self):
+			while True:
+				priorityQueueState, actionObject = self.getActionObject()	#get the next actionObject or actionSet from the queue.
+				if priorityQueueState:
+					while not actionObject.isReleased():	#wait for actionObject or actionSet to be released
+						time.sleep(0.0005)
+					for thisActionObject in self.serialize(actionObject): 
+						self.interface.channelAccess.putActionObject(thisActionObject) #transfer action object to the channel access thread.
+				time.sleep(0.0005)
+		
+		def serialize(self, actionObject):
+			'''serializes actionSets into actionObjects.'''
+			if actionObject._type_ == 'actionObject': return [actionObject]	#note _type_ is defined in the actionObject class
+			#put handler for core.actionSet here once ready.
+			return []
+			
+		def getActionObject(self):
+			try:
+				return True, self.channelPriorityQueue.get()
+			except:
+				return False, None					
 
+		def putActionObject(self, actionObject):
+			self.channelPriorityQueue.put(actionObject)
+			return True
+			
 #----UTILITY CLASSES---------------
 class CRC():
 	'''Generates CRC bytes and checks CRC validated packets.'''
