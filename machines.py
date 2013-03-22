@@ -2,6 +2,7 @@
 from gestalt.utilities import notice as notice
 import math
 import copy
+import threading
 
 #VIRTUAL MACHINE BASE CLASS
 class virtualMachine(object):
@@ -56,6 +57,10 @@ class coordinates():
 				return coordinates.uFloat(self * self.conversionDictionary[targetUnits], targetUnits)
 			else: return False
 	
+	def uFloatSubtract(self, term1, term2):
+		'''Returns a list containing term1 - term2 with units.'''
+		return [uFloat(x - y, x.units) for (x,y) in zip(term1, term2)]
+	
 	class baseCoordinate(object):
 		'''A set of ordinates which can be used to define positions of various machine elements.'''
 		def __init__(self, inputList):
@@ -75,7 +80,11 @@ class coordinates():
 				for index, item in enumerate(valueArray):
 					self.baseList[index] = coordinates.uFloat(item, self.baseList[index].units)
 				return True
-	
+			
+
+#--MACHINE STATE-----
+class state():
+	'''Elements which help keep track of machine state.'''
 	class coordinate(object):
 		'''A collection of coordinates which stores both actual (real-time) and future (buffered) machine positions.'''
 		def __init__(self, inputList):
@@ -89,7 +98,6 @@ class coordinates():
 		def commit(self, inputList):
 			'''Updates most recent change to machine position used for calculating future moves.'''
 			return self.future.set(inputList)
-
 
 #--ELEMENTS-----
 class elements():
@@ -204,6 +212,7 @@ class kinematics():
 		'''A base class for defining transformation matrices.'''
 		def __init__(self, array):
 			self.array = array
+			self.length = len(array[0])	#the number of columns of the array
 		
 		def __call__(self, inputVector):
 			return self.transform(inputVector)
@@ -217,20 +226,100 @@ class kinematics():
 		def dot(self, array1, array2):
 			dotProduct = 0.0
 			for index, value in enumerate(array1): dotProduct += float(array1[index])*float(array2[index])
-			return dotProduct
+			return coordinates.uFloat(dotProduct, array2[0].units)	#grabs units from input vector
 	
 	
-	class identity(matrix):
+	class identityMatrix(matrix):
 		'''A square matrix of size = order with 1's on the diagonal and zeros elsewhere.'''
 		def __init__(self, order):
 			self.array = [[1 if i==j else 0 for j in range(order)] for i in range(order)]
+			self.length = order
 	
-	class routeForward(matrix):
+	class routeForwardMatrix(matrix):
 		'''A square matrix which routes according to the provided routing list.'''
 		def __init__(self, routingList):
 			self.array = [[1 if index == value else 0 for index in range(len(routingList))] for value in routingList]
+			self.length = len(routingList)
 			
-	class routeReverse(matrix):
+	class routeReverseMatrix(matrix):
 		'''A square matrix which routes according to the inverse of the provided routing list.'''
 		def __init__(self, routingList):
 			self.array = [[1 if index == value else 0 for value in routingList] for index in range(len(routingList))]
+			self.length = len(routingList)
+			
+	class compoundMatrix(matrix):
+		'''A matrix which is composed of several matrices arranged along the diagonal.'''
+		def __init__(self, inputMatrices):
+			if type(inputMatrices) != list:	#make sure that input is a list
+				notice(self, 'expected input of type list but instead got type ' + str(list))
+				return False
+			self.arrays = inputMatrices
+			self.lengths = [array.length for array in inputMatrices]	#stores lengths of each array
+			self.length = sum(self.lengths)
+		
+		def transform(self, inputVector):
+			splitInput = []
+			originPosition = 0
+			#split input vector into sections corresponding to transform array
+			for sectionLength in self.lengths:
+				splitInput += [inputVector[originPosition:originPosition + sectionLength]]
+				originPosition += sectionLength
+			#transform each section separately
+			transformedOutput = []
+			for index, input in enumerate(splitInput):
+				print input
+				transformedOutput += self.arrays[index].transform(input)
+			return transformedOutput
+	
+	
+	class transform(object):
+		'''Contains methods for transforming in the forwards and reverse directions.'''
+		def __init__(self, forwardMatrix, reverseMatrix):
+			self.forwardMatrix = forwardMatrix
+			self.reverseMatrix = reverseMatrix
+		
+		def forward(self, inputVector):
+			return self.forwardMatrix.transform(inputVector)
+		
+		def reverse(self, inputVector):
+			return self.reverseMatrix.transform(inputVector)
+		
+	class direct(transform):
+		def __init__(self, order):
+			self.forwardMatrix = kinematics.identityMatrix(order)
+			self.reverseMatrix = kinematics.identityMatrix(order)
+	
+	class route(transform):
+		def __init__(self, routingList):
+			self.forwardMatrix = kinematics.routeForwardMatrix(routingList)
+			self.reverseMatrix = kinematics.routeReverseMatrix(routingList)
+	
+	class compound(transform):
+		def __init__(self, inputTransforms):
+			self.forwardMatrix = kinematics.compoundMatrix([transform.forwardMatrix for transform in inputTransforms])
+			self.reverseMatrix = kinematics.compoundMatrix([transform.reverseMatrix for transform in inputTransforms])
+	
+	class hbot(transform):
+		def __init__(self):
+			self.forwardMatrix = kinematics.matrix([[0.5,0.5],[0.5,-0.5]])
+			self.reverseMatrix = kinematics.matrix([[1, 1], [1, -1]])
+			
+	class chain(transform):
+		'''Allows a series of kinematics to be chained together.'''
+		def __init__(self, forwardChain):
+			self.forwardChain = forwardChain
+			self.reverseChain = copy.copy(forwardChain)	#makes a shallow copy
+			self.reverseChain.reverse()	#reverses inputChain
+		
+		def forward(self, inputVector):
+			for transform in self.forwardChain:
+				inputVector = transform.forward(inputVector)
+			return inputVector
+		
+		def reverse(self, inputVector):
+			for transform in self.reverseChain:
+				inputVector = transform.reverse(inputVector)
+			return inputVector
+		
+		
+		

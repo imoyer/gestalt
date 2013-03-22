@@ -1,12 +1,13 @@
 #----IMPORTS------------
-
+from gestalt.machines import coordinates
+from gestalt import utilities
 #----FUNCTIONS--------------
 #
 # A Gestalt class for building methods for Gestalt
 
 class gFunction(object):
 	def __call__(self, *args, **kwargs):
-		return self.gFunctionCore(self)._init(*args, **kwargs)	#allows gFunctionObject to return
+		return self.gFunctionCore(self)._init(*args, **kwargs)	#allows gFunctionObject to return, gFunctionCore is defined by the user
 	
 	def receiver(self, packet):
 		decodedPacket = self.packet.decode(packet)
@@ -60,3 +61,59 @@ class gFunctionObject(object):
 		pass
 	def callback(self):
 		pass
+	
+class move(object):
+	def __init__(self, virtualMachine = None, virtualNodes = None, axes = None, kinematics = None, machinePosition = None):
+		'''Configures the move object.'''
+		
+		#convert inputs to lists where appropriate
+		if type(virtualNodes) != list: virtualNodes = [virtualNodes]
+		if type(axes) != list: axes = [axes]
+		
+		self.virtualMachine = virtualMachine #a reference to the virtual machine which owns this function.
+		self.virtualNodes = virtualNodes #a list of nodes which will be used by the function.
+		self.axes = axes #a list of axes which connect physical actuators to the machine kinematics. Some nodes support multiple axes.
+		self.kinematics = kinematics #a kinematics object which will transform between axis coordinates and machine coordinates
+		self.machinePosition = machinePosition #the positional state of the machine.
+		
+	def __call__(self, *args, **kwargs):
+		return moveObject(self, *args, **kwargs)	#returns a move object which can be used by external synchronization methods
+
+class moveObject(object):
+	def __init__(self, move, position, velocity = None, acceleration = None):
+		#store parameters
+		self.move = move	#the calling move class
+		self.positionCommand = position
+		self.velocityCommand = velocity
+		self.accelerationCommand = acceleration
+		
+		#calculate deltas
+		currentMachinePosition = self.move.machinePosition.future()	#get the current machine position
+		
+		requestedMachinePosition = []	#build up the requested machine position based on what is provided and what is left as 'None'.
+		for axisIndex, axisPosition in enumerate(self.positionCommand):
+			requestedMachinePosition += [coordinates.uFloat(axisPosition if axisPosition else currentMachinePosition[axisIndex], currentMachinePosition[axisIndex].units)]	#anything left as none is unchanged
+			
+		transformedCurrentAxisPositions = self.move.kinematics.reverse(currentMachinePosition)	#calculates the current axis positions based on the kinematics transformation matrix
+		transformedRequestedAxisPositions = self.move.kinematics.reverse(requestedMachinePosition)	#calculates the requested axis positions based on the kinematics transformation matrix
+		
+		currentMotorPositions = []
+		for axisIndex, axisPosition in enumerate(transformedCurrentAxisPositions):
+			currentMotorPositions += [self.move.axes[axisIndex].reverse(axisPosition)]
+		
+		requestedMotorPositions = []
+		for axisIndex, axisPosition in enumerate(transformedRequestedAxisPositions):
+			requestedMotorPositions += [self.move.axes[axisIndex].reverse(axisPosition)]
+
+		machineDeltas = [x-y for (x,y) in zip(requestedMachinePosition, currentMachinePosition)] #machine position deltas
+		motorDeltas = [coordinates.uFloat(x - y, x.units) for (x,y) in zip(requestedMotorPositions, currentMotorPositions)]
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
