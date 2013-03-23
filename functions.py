@@ -6,6 +6,9 @@
 from gestalt.machines import coordinates
 from gestalt import utilities
 from gestalt import core
+import time
+import Queue
+import threading
 #----FUNCTIONS--------------
 
 class serviceRoutine(object):
@@ -42,8 +45,22 @@ class serviceRoutine(object):
 		
 	def receive(self, packet):	#this should get overridden
 		self.responseFlag.set()  #by default, all it does is set the response flag.
-	
 
+
+class motionPlanner(threading.Thread):
+	def __init__(self, virtualMachine):
+		self.virtualMachine = virtualMachine
+		threading.Thread.__init__(self) #initialize via threading superclass
+		self.plannerQueue = Queue.Queue(1)	#new planner queue, max size is 1 because want to control internal size of list
+
+	def run(self):
+		while True:
+			time.sleep(0.0005)
+				
+				
+				
+				
+				
 class move(object):
 	def __init__(self, virtualMachine = None, virtualNodes = None, axes = None, kinematics = None, machinePosition = None):
 		'''Configures the move object.'''
