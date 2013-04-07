@@ -36,7 +36,7 @@ class serviceRoutine(object):
 		self.packetHolder = packetHolder	#will contain an inbound packet for transfer between the serviceRoutine and the actionObject	
 	
 	def __call__(self, *args, **kwargs):
-		return self.actionObject(self)._init(*args, **kwargs)	#allows gFunctionObject to return, gFunctionCore is defined by the user
+		return self.actionObject(self)._init(*args, **kwargs)	#allows actionObject to return, actionCore is defined by the user
 	
 	def receiver(self, packet):
 		decodedPacket = self.packet.decode(packet)

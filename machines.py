@@ -17,6 +17,7 @@ class virtualMachine(object):
 		self.initCoordinates()
 		self.initKinematics()
 		self.initFunctions()
+		self.initLast()
 		
 	def initInterfaces(self):
 		pass
@@ -35,6 +36,9 @@ class virtualMachine(object):
 		pass
 	
 	def init(self):
+		pass
+	
+	def initLast(self):
 		pass
 	
 #--COORDINATES-----
