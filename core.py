@@ -24,6 +24,10 @@ class actionObject(object):
 		if returnObject != None: return returnObject	#return whatever is returned by the user
 		else: return self	#otherwise return self
 	
+	def new(self, *args, **kwargs):
+		'''Will create a new instance of self, duplicating references created on instantiation.'''
+		return self.__class__(self.serviceRoutine)._init(*args, **kwargs)	#this is the same as what's called by the serviceRoutine
+	
 	def setPacket(self, packet, mode = 'unicast'):
 		self.packetSet = self.packetEncoder(packet)
 		self.mode = mode

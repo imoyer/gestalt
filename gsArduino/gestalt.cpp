@@ -78,7 +78,11 @@ volatile uint8_t IO_txEnablePin; //Transmit enable for RS485
 
 //--DEFINE NODE VARIABLES--
 uint8_t networkAddress[2];	//network address
+#ifdef compileLite
+  char defaultURL[] = "";
+#else
 char defaultURL[] = "http://tq.mit.edu/gestalt/086-000.py";	//node URL
+#endif
 char *url = 0;	//pointer to URL
 uint8_t urlLength = 0;	//stores current URL length
 
@@ -132,7 +136,9 @@ const uint8_t bootloaderDataPort    = 3;
 const uint8_t bootloaderReadPort    = 4;
 const uint8_t urlPort				        = 5;
 const uint8_t setIPPort			        = 6;
-const uint8_t identifyPort	        = 7;
+#ifndef compileLite
+  const uint8_t identifyPort	        = 7;
+#endif
 const uint8_t resetPort			        = 255;
 
 //--DEFINE TRANCEIVER SETTINGS--
@@ -238,10 +244,16 @@ void setup(){
   
   //INITIALIZE USART
   #ifdef standardGestalt
-  UBRR0 = 9;  //9 = 115.2kbps, 14 = 76.8kbps @18.432MHz NOTE: standard gestalt nodes with a 18.432MHz clock communicate at 115.2kbps
+    #if F_CPU == 18432000
+      UBRR0 = 9;  //9 = 115.2kbps, 14 = 76.8kbps @18.432MHz NOTE: standard gestalt nodes with a 18.432MHz clock communicate at 115.2kbps
+    #endif
+    #if F_CPU == 16000000
+      UBRR0 = 12;  //8 = 115.2kbps, 12 = 76.8kbps @16MHz NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
+    #endif      
   #else
   UBRR0 = 12;  //8 = 115.2kbps, 12 = 76.8kbps @16MHz NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
   #endif
+
   UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(0<<UDRIE0)|(1<<RXCIE0)|(0<<TXCIE0);  //enable transmitter and receiver, rx interrupts
   UCSR0C = (0 << UMSEL00) | (0 << UPM00) | (0 << USBS0) | (3 <<UCSZ00);  //8 data bits, 1 stop bit, no parity
 
@@ -435,11 +447,11 @@ void packetRouter(){
 			case setIPPort: //set IP address
 				svcSetIPAddress();
 				break;
-		
+		  #ifndef compileLite
 			case identifyPort: //identify node
 				svcIdentifyNode();
 				break;
-					
+			#endif
 			case resetPort: //reset node
 				svcResetNode();
 				break;
@@ -465,6 +477,7 @@ void packetRouter(){
 
 //------SERVICE ROUTINES---------------------
 
+#ifndef compileLite
 //--IDENTIFY NODE--
 void svcIdentifyNode(){
 	uint32_t counter = 0;
@@ -475,6 +488,7 @@ void svcIdentifyNode(){
 	}
 	*IO_ledPORT &= ~(IO_ledPin);	//turn off LED
 }
+#endif
 
 //--REQUEST URL--
 void svcRequestURL(){

@@ -186,35 +186,39 @@ class gestaltNodeShell(baseNodeShell):
 		
 		#connect to interface
 		if interface:
+			#make sure that node has a gestalt interface
 			if type(interface) != interfaces.gestaltInterface:
 				#wrap a gestalt interface around the provided interface
 				self.interface.set(interfaces.gestaltInterface(interface = interface, owner = self), self)
 			else: self.interface.set(interface, self)	#interface isn't shared with other nodes, so owner is self.		
+		
+			#import base node
+			self.setNode(baseStandardGestaltNode())		
+			
+			#set node IP address	-- this will be changed later once persistence is added
+			IP = self.generateIPAddress()	#generate random IP address
+			self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
+			if type(self) == 'gestalt.nodes.networkedGestaltNode': notice(self, "please identify me on the network.")
+			
+			nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retrieve URL. This goes away with persistence.
+			
+			notice(self, nodeURL)
+	
+			#try to start node in application mode
+			nodeStatus, appValid = self.statusRequest()
+			if nodeStatus == 'B' and appValid:	#node is in bootloader mode and application is valid
+				if self.runApplication():	#need to reinitialize
+					nodeURL = self.urlRequest()
+					notice(self, " NOW RUNNING IN APPLICATION MODE")
+					notice(self, nodeURL)	#remove
+				else:
+					notice(self, "ERROR STARTING APPLICATION MODE")
+			elif nodeStatus == 'A': notice(self, "RUNNING IN APPLICATION MODE")
+			else: notice(self, " RUNNING IN BOOTLOADER MODE")
+			
 		else:
-			notice(self, 'Error - please provide an interface.')
-		#import base node
-		self.setNode(baseStandardGestaltNode())		
-		
-		#set node IP address	-- this will be changed later once persistence is added
-		IP = self.generateIPAddress()	#generate random IP address
-		self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
-		if type(self) == 'gestalt.nodes.networkedGestaltNode': notice(self, "please identify me on the network.")
-		
-		nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retrieve URL. This goes away with persistence.
-		
-		notice(self, nodeURL)
-
-		#try to start node in application mode
-		nodeStatus, appValid = self.statusRequest()
-		if nodeStatus == 'B' and appValid:	#node is in bootloader mode and application is valid
-			if self.runApplication():	#need to reinitialize
-				nodeURL = self.urlRequest()
-				notice(self, " NOW RUNNING IN APPLICATION MODE")
-				notice(self, nodeURL)	#remove
-			else:
-				notice(self, "ERROR STARTING APPLICATION MODE")
-		elif nodeStatus == 'A': notice(self, "RUNNING IN APPLICATION MODE")
-		else: notice(self, " RUNNING IN BOOTLOADER MODE")		
+			#No interface, this can be intentional to allow debugging offline
+			notice(self, 'Error - please provide an interface.')		
 
 		#acquire virtual node.
 		#if a virtual node source is provided, use that. Otherwise acquire from URL provided by node.
@@ -229,9 +233,10 @@ class gestaltNodeShell(baseNodeShell):
 		#get URL from node
 		else:
 			if not self.loadNodeFromURL(nodeURL): return
-			
-		#assign new node with old IP address to interface
-		self.interface.assignNode(self.node, IP)
+		
+		if interface:	
+			#assign new node with old IP address to interface
+			self.interface.assignNode(self.node, IP)
 
 
 	def generateIPAddress(self):
