@@ -95,6 +95,10 @@ class actionObject(object):
 	def getPacket(self):
 		return self.serviceRoutine.packetHolder.get()
 
+class actionSequence(object):
+	def __init__(self, *actionObjects):
+		self.actionObjects = actionObjects
+		
 
 class gFunctionObject(object):
 	def __init__(self, gFunc):
