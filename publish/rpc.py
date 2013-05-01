@@ -45,7 +45,10 @@ class httpRPCDispatch(object):
 		jsonEncoder = json.JSONEncoder()
 		
 		def do_GET(self):
-			inboundIP, inboundPort = self.client_address
+			
+			inboundIP, inboundPort = self.client_address	#this should be from the user's browser (127.0.0.1).
+			requestHeaders = dict(self.headers.items())
+			origin = requestHeaders['origin']	#this is the origin header as provided by the browser. Must match an entry in allowOrigins. 
 			parsedURL = urlparse.urlparse(self.path)
 			
 			#get the name of the requested procedure
@@ -60,7 +63,7 @@ class httpRPCDispatch(object):
 					pass
 
 			#check the functions list for the requested procedure
-			if procedure in self.functions:
+			if (procedure in self.functions) and (inboundIP == '127.0.0.1') and (origin in self.allowOrigins):
 				procedureObject = self.functions[procedure]
 				try:
 					procedureName = procedureObject.__name__	#a function was provided
@@ -68,17 +71,17 @@ class httpRPCDispatch(object):
 					procedureName = procedureObject.__class__.__name__	#a class object was provided
 					
 				#note that RPC only supports keyword arguments because the order is not guaranteed.
-				try:
-					returnValues = procedureObject(**parameters)	#make procedure call
-					print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'
-					print self.jsonEncoder.encode(returnValues)
-				except:
-					print sys.exc_info()[0]
+				returnValues = procedureObject(**parameters)	#make procedure call
+				print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'
+				if returnValues:	#send a response
+					self.send_response(200)
+					self.send_header('Access-Control-Allow-Origin', origin)
+					self.send_header('Content-Type', 'application/json')
+					self.end_headers()
+					self.wfile.write(self.jsonEncoder.encode(returnValues))
+					return
 			else:
 				self.send_error(404)
-				
-				
-			
 				
 				
 	
