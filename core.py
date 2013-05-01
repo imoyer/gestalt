@@ -91,56 +91,34 @@ class actionObject(object):
 		self.release()
 		self.interface.commit(self)
 		
-	
 	def getPacket(self):
+		'''Returns a packet waiting in the packet holder.'''
 		return self.serviceRoutine.packetHolder.get()
+	
+	def __actionSequence__(self, *argLists):
+		'''Returns an actionSequence filled with recursively called actionObjects using parameters stored in argLists.'''
+		return actionSequence(actionObjects = [self.new(*args) for args in zip(*argLists)], parent = self)
+	
 
 class actionSequence(object):
-	def __init__(self, *actionObjects):
+	'''Stores a series of action objects which should get executed sequentially.'''
+	def __init__(self, actionObjects = None, parent = None):
 		self.actionObjects = actionObjects
-		
-
-class gFunctionObject(object):
-	def __init__(self, gFunc):
-		self.gFunction = gFunc
-		self.packetSet = [] #initialize with an empty packet set
-		self.virtualNode = self.gFunction.virtualNode
-		
-	def _init(self, *args, **kwargs):
-		returnObject = self.init(*args, **kwargs) #run user init function
-		if returnObject != None: return returnObject
-		else: return self
-		
-	def updatePacketSet(self, updateInput):
-		self.packetSet = self.gFunction.packetSet(updateInput)
+		self.parent = parent	#this is the spawning action object
 	
-	def getPacketSet(self):
-		return self.packetSet
+	def  __getattr__(self, attribute):
+		'''	Forwards all unsupported calls to the parent actionObject.'''
+		if hasattr(self.parent, attribute):	#parent actionObject contains requested attribute
+			return getattr(self.parent, attribute)
+		else:
+			notice(self, "ActionObject DOESN'T HAVE REQUESTED ATTRIBUTE")
+			raise AttributeError(attribute)
 	
-	def getPort(self):
-		return self.virtualNode.bindPort.outPorts[self.gFunction]
-	
-	def transmit(self, mode = 'unicast'):
-		self.gFunction.responseFlag.clear()	#clears flag, in case it wasn't cleared by a responding function
-		self.virtualNode.transmit([self], mode)	#transmit 
-	
-	def waitForResponse(self, timeout = None):
-		if self.gFunction.responseFlag.wait(timeout):
-			self.gFunction.responseFlag.clear()
-			return True
-		return False
-	
-	def getPacket(self):
-		return self.gFunction.packetHolder.get()
-		
-	
-	def init(self):
-		pass
-	def sync(self):
-		pass
-	def calculate(self):
-		pass
 	def commit(self):
-		pass
-	def callback(self):
-		pass
+		'''Commits all member actionObjects to their interface's priority queue.'''
+		for actionObject in self.actionObjects:
+			actionObject.commit()
+	
+	def release(self):
+		for actionObject in self.actionObjects:
+			actionObject.release()

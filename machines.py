@@ -1,8 +1,10 @@
 #--IMPORTS-----
 from gestalt.utilities import notice as notice
+from gestalt.publish import publish
 import math
 import copy
 import threading
+import inspect
 
 #VIRTUAL MACHINE BASE CLASS
 class virtualMachine(object):
@@ -11,13 +13,17 @@ class virtualMachine(object):
 	While many machines won't need the pre-built initializers which get called, they
 	are provided to introduce some structure to the format of user virtual machines.'''
 	def __init__(self, *args, **kwargs):
+		self.name = inspect.getfile(self.__class__) #for generating proper notice commands
+		self.publishEnabled = True	#this should get set explicitly to false in user init by calling disablePublishing
 		self.init(*args, **kwargs)	#calls child class init function
 		self.initInterfaces()
 		self.initControllers()
 		self.initCoordinates()
 		self.initKinematics()
 		self.initFunctions()
+		self.initPublish()
 		self.initLast()
+		self.publish()
 		
 	def initInterfaces(self):
 		pass
@@ -40,6 +46,23 @@ class virtualMachine(object):
 	
 	def initLast(self):
 		pass
+	
+	def disablePublishing(self):
+		self.publishEnabled = False
+	
+	def enablePublishing(self):
+		self.publishEnabled = True
+		
+	def initPublish(self):
+		if self.publishEnabled:
+			self.publisher = publish.publisher()
+		else:
+			self.publisher = None
+	
+	def publish(self):
+		#this method intended to be overwritten by user
+		pass
+	
 	
 #--COORDINATES-----
 class coordinates():
@@ -185,6 +208,12 @@ class elements():
 				notice(self, 'expected input of type list but instead got '+ str(type(elements)))
 				return None
 	
+	class microstep(element):
+		def __init__(self, microstepCount):
+			self.init(inputUnits = 'usteps', outputUnits = 'steps', transformation = 1/float(microstepCount)) #microsteps -> 1/microstepCount -> steps
+			self.steps = self.transformForward
+			self.usteps = self.transformReverse
+	
 	class stepper(element):
 		def __init__(self, stepAngle):
 			self.init(inputUnits = 'steps', outputUnits = 'rev', transformation = stepAngle/360.0)	#steps -> stepAngle/360 -> revolutions
@@ -271,7 +300,6 @@ class kinematics():
 			#transform each section separately
 			transformedOutput = []
 			for index, input in enumerate(splitInput):
-				print input
 				transformedOutput += self.arrays[index].transform(input)
 			return transformedOutput
 	
@@ -304,9 +332,12 @@ class kinematics():
 			self.reverseMatrix = kinematics.compoundMatrix([transform.reverseMatrix for transform in inputTransforms])
 	
 	class hbot(transform):
-		def __init__(self):
-			self.forwardMatrix = kinematics.matrix([[0.5,0.5],[0.5,-0.5]])
-			self.reverseMatrix = kinematics.matrix([[1, 1], [1, -1]])
+		def __init__(self, invertX = False, invertY = False):
+			invertX = {True:-1, False: 1}[invertX]
+			invertY = {True:-1, False:1}[invertY]
+			
+			self.forwardMatrix = kinematics.matrix([[0.5*invertX,0.5*invertX],[0.5*invertY,-0.5*invertY]])
+			self.reverseMatrix = kinematics.matrix([[1*invertX, 1*invertY], [1*invertX, -1*invertY]])
 			
 	class chain(transform):
 		'''Allows a series of kinematics to be chained together.'''
