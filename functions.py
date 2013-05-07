@@ -47,7 +47,15 @@ class serviceRoutine(object):
 	def receive(self, packet):	#this should get overridden
 		self.responseFlag.set()  #by default, all it does is set the response flag.
 		
-				
+
+class jog(object):
+	def __init__(self, move):
+		self.move = move
+	
+	def __call__(self, incrementalPosition = None, velocity = None, acceleration = None):
+		currentMachinePosition = self.move.machinePosition.future()
+		jogPosition = [(incremental + absolute) for incremental, absolute in zip(incrementalPosition, currentMachinePosition)]
+		return self.move(jogPosition, velocity, acceleration)
 				
 class move(object):
 	def __init__(self, virtualMachine = None, virtualNode = None, axes = None, kinematics = None, machinePosition = None, defaultAcceleration = 200):
@@ -152,19 +160,30 @@ class moveObject(object):
 		for axisIndex, axisPosition in enumerate(transformedRequestedAxisPositions):
 			requestedMotorPositions += [self.move.axes[axisIndex].reverse(axisPosition)]
 
-		machineDeltas = [x-y for (x,y) in zip(requestedMachinePosition, currentMachinePosition)] #machine position deltas
+#		machineDeltas = [x-y for (x,y) in zip(requestedMachinePosition, currentMachinePosition)] #machine position deltas
 		motorDeltas = [coordinates.uFloat(x - y, x.units) for (x,y) in zip(requestedMotorPositions, currentMotorPositions)]
 		
-		actualDeltas = [coordinates.uFloat(int(delta), delta.units) for delta in motorDeltas]	#rounds steps down.
+		actualMotorDeltas = [coordinates.uFloat(int(round(delta,0)), delta.units) for delta in motorDeltas]	#rounds steps down.
 		
 		#create actionObjects and commit to the channel priority queue
-		self.actionObjects = self.move.virtualNode.spinRequest(axesSteps = actualDeltas, accelSteps = 0, decelSteps = 0, accelRate = 0, external = True)
+		self.actionObjects = self.move.virtualNode.spinRequest(axesSteps = actualMotorDeltas, accelSteps = 0, decelSteps = 0, accelRate = 0, external = True)
 		self.actionObjects.commit()	#this will lock in their place in the transmit queue, however will not release until this move object is run thru the motion planner
 		
 		#commit self to the path planner.
 		self.commit()
 		
 		#recalculate future machine position
+		newMotorPositions = [coordinates.uFloat(x+y, x.units) for (x,y) in zip(actualMotorDeltas, currentMotorPositions)]
+		
+		transformedNewAxisPositions = []
+		for motorIndex, motorPosition in enumerate(newMotorPositions):
+			transformedNewAxisPositions += [self.move.axes[motorIndex].forward(motorPosition)]
+		
+		newMachinePosition = self.move.kinematics.forward(transformedNewAxisPositions)
+		self.move.machinePosition.future.set(newMachinePosition)
+		
+		print "MACHINE POSITION:" + str(self.move.machinePosition.future())
+		print "MOTOR DELTAS:" + str(motorDeltas)
 		
 	
 	def commit(self):
