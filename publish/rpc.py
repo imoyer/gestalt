@@ -9,6 +9,7 @@ import urlparse
 import ast	#abstract syntax trees, for parsing query inputs
 import sys
 import json
+import urllib2	#for opening from URLs
 
 class fileRPCDispatch(object):
 	'''Reads in remote procedure calls from a file and executes them.'''
@@ -24,8 +25,12 @@ class fileRPCDispatch(object):
 			externalName, internalFunction = arg
 			self.functions.update({externalName: internalFunction})
 	
-	def loadFile(self, fileName):
+	def loadFromFile(self, fileName):
 		self.sourceFile = open(fileName, 'rU')	#opens the sourcefile in read-only, universal newline support, mode.
+		
+	def loadFromURL(self, URL):
+		print URL
+		self.sourceFile = urllib2.urlopen(URL)	#tries to open the URL as provided
 		
 	def runSingle(self):
 		while True:
@@ -131,7 +136,6 @@ class httpRPCDispatch(object):
 					parameters.update({parameter:ast.literal_eval(value[0])})
 				except:
 					pass
-
 			#check the functions list for the requested procedure
 			if (procedure in self.functions) and (inboundIP == '127.0.0.1') and (origin in self.allowOrigins):
 				procedureObject = self.functions[procedure]
@@ -143,13 +147,13 @@ class httpRPCDispatch(object):
 				#note that RPC only supports keyword arguments because the order is not guaranteed.
 				returnValues = procedureObject(**parameters)	#make procedure call
 				print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'
+				self.send_response(200)
+				self.send_header('Access-Control-Allow-Origin', origin)
+				self.send_header('Content-Type', 'application/json')
+				self.end_headers()
 				if returnValues:	#send a response
-					self.send_response(200)
-					self.send_header('Access-Control-Allow-Origin', origin)
-					self.send_header('Content-Type', 'application/json')
-					self.end_headers()
 					self.wfile.write(self.jsonEncoder.encode(returnValues))
-					return
+				return
 			else:
 				self.send_error(404)
 	
