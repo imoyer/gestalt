@@ -147,15 +147,16 @@ class moveObject(object):
 		
 		requestedMachinePosition = []	#build up the requested machine position based on what is provided and what is left as 'None'.
 		for axisIndex, axisPosition in enumerate(self.positionCommand):
-			requestedMachinePosition += [coordinates.uFloat(axisPosition if axisPosition else currentMachinePosition[axisIndex], currentMachinePosition[axisIndex].units)]	#anything left as none is unchanged
+			requestedMachinePosition += [coordinates.uFloat(axisPosition if axisPosition != None else currentMachinePosition[axisIndex], currentMachinePosition[axisIndex].units)]	#anything left as none is unchanged
+		
 			
 		transformedCurrentAxisPositions = self.move.kinematics.reverse(currentMachinePosition)	#calculates the current axis positions based on the kinematics transformation matrix
 		transformedRequestedAxisPositions = self.move.kinematics.reverse(requestedMachinePosition)	#calculates the requested axis positions based on the kinematics transformation matrix
-		
+
 		currentMotorPositions = []
 		for axisIndex, axisPosition in enumerate(transformedCurrentAxisPositions):
 			currentMotorPositions += [self.move.axes[axisIndex].reverse(axisPosition)]
-		
+
 		requestedMotorPositions = []
 		for axisIndex, axisPosition in enumerate(transformedRequestedAxisPositions):
 			requestedMotorPositions += [self.move.axes[axisIndex].reverse(axisPosition)]

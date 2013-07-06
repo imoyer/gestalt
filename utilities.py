@@ -1,4 +1,6 @@
 import math
+import ast
+import datetime
 
 def notice(source = None, message = ""):
 	''' Sends a notice to the user.
@@ -27,6 +29,48 @@ def notice(source = None, message = ""):
 		else:
 			print str(source) + ": " + str(message)
 
+class persistenceManager(object):
+	'''Handles interacting with persistence files.'''
+	def __init__(self, filename = None, namespace = None):
+		self.filename = filename
+		self.namespace = namespace
+	
+	def __call__(self):
+		if self.filename: return self
+		else: return False
+
+	def get(self, name):
+		persistenceDict = self.readPersistenceDictionary()
+		lookup = self.namespace + '.' + name
+		if lookup in persistenceDict:
+			return persistenceDict[self.namespace + '.' + name]
+		else:
+			return None
+
+
+	def set(self, name, value):
+		persistenceDict = self.readPersistenceDictionary()
+		persistenceDict.update({self.namespace + '.' + name: value})
+		self.writePersistenceDictionary(persistenceDict)
+			
+	def readPersistenceDictionary(self):
+		try:
+			fileObject = open(self.filename, 'rU')
+			persistenceDict = ast.literal_eval(fileObject.read())
+			fileObject.close()
+			return persistenceDict
+		except IOError:
+			return {}
+	
+	def writePersistenceDictionary(self, persistenceDict):
+		fileObject = open(self.filename, 'w')
+		fileObject.write("# This Gestalt persistence file was auto-generated @ " + str(datetime.datetime.now()) + "\n")
+		fileObject.write("{\n")
+		for key in persistenceDict:
+			fileObject.write("'" + key + "'" + ":" + str(persistenceDict[key]) + ",\n")
+		fileObject.write("}")
+		fileObject.close()
+		
 def intToBytes(integer, numbytes):
 	bytes = range(numbytes)
 	for i in bytes:

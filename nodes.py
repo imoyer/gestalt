@@ -159,7 +159,7 @@ class soloIndependentNode(baseNodeShell):
 
 class gestaltNodeShell(baseNodeShell):
 	'''Base class for all nodes which communicate using the gestalt protocol.'''
-	def __init__(self, name = None, interface = None, filename = None, URL = None, module = None, **kwargs):
+	def __init__(self, name = None, interface = None, filename = None, URL = None, module = None, persistence = None, **kwargs):
 		'''	Initialization procedure for Gestalt Node Shell.
 			
 			name:		a unique name assigned by the user. This is used by the persistence algorithm to re-acquire the node.
@@ -183,6 +183,7 @@ class gestaltNodeShell(baseNodeShell):
 		self.filename = filename
 		self.URL = URL
 		self.module = module
+		self.persistence = persistence
 		
 		#connect to interface
 		if interface:
@@ -195,13 +196,20 @@ class gestaltNodeShell(baseNodeShell):
 			#import base node
 			self.setNode(baseStandardGestaltNode())		
 			
-			#set node IP address	-- this will be changed later once persistence is added
-			IP = self.generateIPAddress()	#generate random IP address
-			self.interface.assignNode(self.node, IP)	#assign node to interface with IP address
-			if type(self) == 'gestalt.nodes.networkedGestaltNode': notice(self, "please identify me on the network.")
+			if self.persistence(): address = self.persistence.get(self.name)
+			else: address = None
 			
-			nodeURL = self.node.setIPRequest(IP)	#set real node's IP address, and retrieve URL. This goes away with persistence.
-			
+			if address:	#an IP address was found
+				self.interface.assignNode(self.node, address)	#assign node to interface with IP address
+				nodeURL = self.node.urlRequest()	#get node URL
+			else: #acquire node
+				#set node IP address	-- this will be changed later once persistence is added
+				address = self.generateIPAddress()	#generate random IP address
+				self.interface.assignNode(self.node, address)	#assign node to interface with IP address	
+				if type(self) == networkedGestaltNode: notice(self, "please identify me on the network.")
+				nodeURL = self.node.setIPRequest(address)	#set real node's IP address, and retrieve URL.		
+				if self.persistence(): self.persistence.set(self.name, address)
+				
 			notice(self, nodeURL)
 	
 			#try to start node in application mode
@@ -235,8 +243,8 @@ class gestaltNodeShell(baseNodeShell):
 			if not self.loadNodeFromURL(nodeURL): return
 		
 		if interface:	
-			#assign new node with old IP address to interface
-			self.interface.assignNode(self.node, IP)
+			#assign new node with old IP address to interface. This replaces the default node with the imported node.
+			self.interface.assignNode(self.node, address)
 
 
 	def generateIPAddress(self):

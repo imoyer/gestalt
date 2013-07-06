@@ -1,4 +1,5 @@
 #--IMPORTS-----
+from gestalt import utilities
 from gestalt.utilities import notice as notice
 from gestalt.publish import publish
 import math
@@ -13,8 +14,29 @@ class virtualMachine(object):
 	While many machines won't need the pre-built initializers which get called, they
 	are provided to introduce some structure to the format of user virtual machines.'''
 	def __init__(self, *args, **kwargs):
-		self.name = inspect.getfile(self.__class__) #for generating proper notice commands
+		
+		if 'name' in kwargs: #set name as provided
+			self.name = kwargs['name']
+		else: #set name to filename for generating proper notice commands
+			self.name = inspect.getfile(self.__class__)
+		
+		if 'persistenceFile' in kwargs:	#set persistence file as provided
+			self.persistenceFilename = kwargs['persistenceFile']
+			if 'name' not in kwargs:	#If no name is provided, and multiple machines share the persistence file, this can result in a namespace conflict.
+				notice(self, 'Warning: setting persistence without providing a name to the virtual machine can result in a conflict in multi-machine persistence files.')
+		else:
+			self.persistenceFilename = None
+			
+		self.persistence = utilities.persistenceManager(filename = self.persistenceFilename, namespace = self.name)
+				
+		if 'interface' in kwargs:
+			self.providedInterface = kwargs['interface']	#interface provided on instantiation of virtual machine.
+		else:
+			self.providedInterface = None
+		
 		self.publishEnabled = True	#this should get set explicitly to false in user init by calling disablePublishing
+		
+		#run user initialization
 		self.init(*args, **kwargs)	#calls child class init function
 		self.initInterfaces()
 		self.initControllers()
@@ -41,11 +63,11 @@ class virtualMachine(object):
 	def initFunctions(self):
 		pass
 	
-	def init(self):
+	def init(self, *args, **kwargs):
 		pass
 	
 	def initLast(self):
-		pass
+		pass		
 	
 	def disablePublishing(self):
 		self.publishEnabled = False
@@ -105,7 +127,8 @@ class coordinates():
 				return False
 			else:
 				for index, item in enumerate(valueArray):
-					self.baseList[index] = coordinates.uFloat(item, self.baseList[index].units)
+					#any None input will not modify value
+					self.baseList[index] = coordinates.uFloat(item, self.baseList[index].units) if item != None else self.baseList[index]
 				return True
 			
 
@@ -257,9 +280,14 @@ class kinematics():
 			return [self.dot(row, inputVector) for row in self.array]
 		
 		def dot(self, array1, array2):
+			#array1 is a dimensionless vector
+			#array2 has dimensions
 			dotProduct = 0.0
-			for index, value in enumerate(array1): dotProduct += float(array1[index])*float(array2[index])
-			return coordinates.uFloat(dotProduct, array2[0].units)	#grabs units from input vector
+			units = None
+			for index, value in enumerate(array1): 
+				dotProduct += float(array1[index])*float(array2[index])
+				if value !=0: units = array2[index].units	#takes on the units of the last vector whose value has contributed to the dot product
+			return coordinates.uFloat(dotProduct, units)
 	
 	
 	class identityMatrix(matrix):

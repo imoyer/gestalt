@@ -163,21 +163,21 @@ class serialInterface(devInterface):
 			searchTerm = self.getSearchTerms('genericSerial')
 		
 		#try to find a single port that's open. This is good for when only a single device is attached.
-#		availablePorts = self.getAvailablePorts(self.deviceScan(searchTerm))
-#		if len(availablePorts) == 1:
-#			self.portName = availablePorts[0]
-#			return self.connect()
-#		else:
-		notice(self.owner, "trying to acquire. Please plug me in.")
-		newPorts = self.waitForNewPort(searchTerm, 10) #wait for new port
-		if newPorts:
-			if len(newPorts) > 1:
-				notice(self.owner, 'Could not acquire. Multiple ports plugged in simultaneously.')
-				return False
-			else:
-				self.portName = newPorts[0]
-				return self.connect()
-		else: return False
+		availablePorts = self.getAvailablePorts(self.deviceScan(searchTerm))
+		if len(availablePorts) == 1:
+			self.portName = availablePorts[0]
+			return self.connect()
+		else:
+			notice(self.owner, "trying to acquire. Please plug me in.")
+			newPorts = self.waitForNewPort(searchTerm, 10) #wait for new port
+			if newPorts:
+				if len(newPorts) > 1:
+					notice(self.owner, 'Could not acquire. Multiple ports plugged in simultaneously.')
+					return False
+				else:
+					self.portName = newPorts[0]
+					return self.connect()
+			else: return False
 	
 	def connect(self, portName = None):
 		'''Locates port for interface on host machine.'''
