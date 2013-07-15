@@ -105,6 +105,9 @@ class httpRPCDispatch(object):
 		'''Adds origins provided as arguments to the list of origins which can access the rpc interface.'''
 		self.allowOrigins += list(args)
 		
+	def allowAllOrigins(self):
+		self.HTTPHandler.allowAllOrigins = True
+	
 	def start(self):
 		self.httpServer.serve_forever()
 	
@@ -113,6 +116,7 @@ class httpRPCDispatch(object):
 		
 		functions = {}		#these are class variables which get updated by the httpRPCDispatch
 		allowOrigins = []
+		allowAllOrigins = False		#this is useful for debugging
 		jsonEncoder = json.JSONEncoder()
 		
 		def do_GET(self):
@@ -137,7 +141,7 @@ class httpRPCDispatch(object):
 				except:
 					pass
 			#check the functions list for the requested procedure
-			if (procedure in self.functions) and (inboundIP == '127.0.0.1') and (origin in self.allowOrigins):
+			if (procedure in self.functions) and (((inboundIP == '127.0.0.1') and (origin in self.allowOrigins)) or self.allowAllOrigins):
 				procedureObject = self.functions[procedure]
 				try:
 					procedureName = procedureObject.__name__	#a function was provided

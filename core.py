@@ -122,3 +122,11 @@ class actionSequence(object):
 	def release(self):
 		for actionObject in self.actionObjects:
 			actionObject.release()
+
+class actionSet(object):
+	'''Stores a set of actionObjects which should be executed simultaneously.'''
+	pass
+
+class syncToken(object):
+	'''Contains tokens used by nodes to synchronize with each other.'''
+	pass

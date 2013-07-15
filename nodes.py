@@ -159,7 +159,7 @@ class soloIndependentNode(baseNodeShell):
 
 class gestaltNodeShell(baseNodeShell):
 	'''Base class for all nodes which communicate using the gestalt protocol.'''
-	def __init__(self, name = None, interface = None, filename = None, URL = None, module = None, persistence = None, **kwargs):
+	def __init__(self, name = None, interface = None, filename = None, URL = None, module = None, persistence = lambda:None, **kwargs):
 		'''	Initialization procedure for Gestalt Node Shell.
 			
 			name:		a unique name assigned by the user. This is used by the persistence algorithm to re-acquire the node.
@@ -607,3 +607,88 @@ class baseStandardGestaltNode(baseGestaltNode):
 				self.waitForChannelAccess()
 				self.transmit()
 				time.sleep(0.1)	#give time for watchdog timer to reset
+
+class compoundNode(object):
+	'''A compound node helps distribute and synchronize function calls across multiple nodes.'''
+	def __init__(self, *nodes):
+		self.nodes = nodes
+		self.nodeCount = len(self.nodes)
+		self.name = "[" + ''.join([str(node.name) + "," for node in nodes])[:-1] + "]"
+		interfaces = [node.interface.Interface for node in nodes]	#nodes have an interface shell
+		if all(interface == interfaces[0] for interface in interfaces):
+			self.commonInterface = True
+		else:
+			self.commonInterface = False
+			notice(self, "warning: not all members of compound node share a common interface!")
+	
+	def  __getattr__(self, attribute):
+		'''	Forwards all unsupported function calls to a distributor'''
+		return self.distributor(self, attribute)
+	
+	class distributor(object):
+		'''The distributor is responsible for forwarding function calls made on the compound node to its constituents.
+		
+		Arguments provided as tuples will be distributed individually. Non-tuple arguments will be duplicated to all
+		nodes.'''
+		
+		
+		def __init__(self, compoundNode, attribute):
+			self.attribute = attribute
+			self.compoundNode = compoundNode
+			self.sync = False	#indicates whether function call is synchronized. This gets set true if any arguments are tuples.
+			
+		def __call__(self, *compoundArguments, **compoundKWarguments):
+			nodeArguments = [[] for i in range(self.compoundNode.nodeCount)]	# a list of arguments for each node 
+			nodeKWarguments = [{} for i in range(self.compoundNode.nodeCount)]	#a list of kwarguments for each node
+			
+			#If a tuple is provided, the items are distributed to respective arguments out lists. Otherwise, the item is copied to all lists.
+			
+			#compile arguments
+			for argument in compoundArguments:
+				if type(argument) == tuple:	#tuple provided, should distribute
+					if len(argument) != self.compoundNode.nodeCount:	#check to make sure that tuple length matches the number of nodes.
+						alert(self.compoundNode, self.attribute + ": not enough arguments provided in tuple.")
+						return False
+					else:
+						self.sync = True	#tuple provided, this will be a synchronized call.
+						for nodeArgPair in zip(nodeArguments, list(argument)):	#iterate thru (targetArgumentList, argument)
+							currentNodeArguments = nodeArgPair[0]
+							currentNodeArguments += [nodeArgPair[1]]
+				else:
+					for node in nodeArguments:
+						node += [argument]
+
+			#compile keyword arguments
+			for key, value in compoundKWarguments.iteritems():
+				if type(value) == tuple:	#tuple provided, should distribute
+					if len(value) != self.compoundNode.nodeCount:
+						alert(self.compoundNode, self.attribute + ": not enough arguments provided in tuple.")
+						return False
+					else:
+						self.sync = True
+						for nodeArgPair in zip(nodeKWarguments, list(value)):
+							currentNodeArguments = nodeArgPair[0]
+							currentNodeArguments.update({key:nodeArgPair[1]})
+				else:
+					for node in nodeKWarguments:
+						node.update({key: value})
+			
+			#if sync, provide a sync token
+			if self.sync:
+				syncToken = core.syncToken()	#pull a new sync token
+				for node in nodeKWarguments:
+					node.update({'sync':syncToken})
+			print nodeArguments
+			#make function calls
+			returnValues = [self.nodeFunctionCall(node, self.attribute, args, kwargs) for node, args, kwargs in zip(self.compoundNode.nodes, nodeArguments, nodeKWarguments)]
+			
+			print returnValues
+
+
+		def nodeFunctionCall(self, node, attribute, args, kwargs):
+			if hasattr(node, attribute):
+				return getattr(node, attribute)(*list(args), **kwargs)
+			else:
+				notice(self.compoundNode, "NODE DOESN'T HAVE REQUESTED ATTRIBUTE")
+				raise AttributeError(attribute)
+				
