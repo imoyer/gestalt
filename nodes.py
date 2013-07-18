@@ -678,7 +678,6 @@ class compoundNode(object):
 				syncToken = core.syncToken()	#pull a new sync token
 				for node in nodeKWarguments:
 					node.update({'sync':syncToken})
-			print nodeArguments
 			#make function calls
 			returnValues = [self.nodeFunctionCall(node, self.attribute, args, kwargs) for node, args, kwargs in zip(self.compoundNode.nodes, nodeArguments, nodeKWarguments)]
 			

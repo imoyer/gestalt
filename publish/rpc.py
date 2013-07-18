@@ -77,7 +77,7 @@ class fileRPCDispatch(object):
 				
 			#note that RPC only supports keyword arguments because the order is not guaranteed.
 			procedureObject(**parameters)	#make procedure call		
-			print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'		
+#			print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'		
 
 
 
@@ -150,7 +150,7 @@ class httpRPCDispatch(object):
 					
 				#note that RPC only supports keyword arguments because the order is not guaranteed.
 				returnValues = procedureObject(**parameters)	#make procedure call
-				print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'
+#				print "REMOTE PROCEDURE CALL: " + procedureName + "(" + ''.join([parameterName + '=' + str(parameterValue) + ',' for parameterName, parameterValue in parameters.iteritems()])[:-1] + ')'
 				self.send_response(200)
 				self.send_header('Access-Control-Allow-Origin', origin)
 				self.send_header('Content-Type', 'application/json')

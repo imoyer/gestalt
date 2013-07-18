@@ -50,10 +50,13 @@ class serviceRoutine(object):
 		
 
 class jog(object):
-	def __init__(self, move):
+	def __init__(self, move, defaultJogSpeed = 20):	#20mm/s
 		self.move = move
+		self.defaultJogSpeed = defaultJogSpeed
 	
 	def __call__(self, incrementalPosition = None, velocity = None, acceleration = None):
+		if velocity == None:
+			velocity = self.defaultJogSpeed
 		currentMachinePosition = self.move.machinePosition.future()
 		jogPosition = [(incremental + absolute) for incremental, absolute in zip(incrementalPosition, currentMachinePosition)]
 		return self.move(jogPosition, velocity, acceleration)
@@ -123,17 +126,22 @@ class move(object):
 
 		def processMoves(self, newMoveObject):
 			'''Performs multi-block look-ahead algorithm.'''
-			self.plannerQueue.append(newMoveObject)	#add new object to the move queue
-			
-			#if more than one item in the queue, calculate junction velocity
-			if len(self.plannerQueue)>1:
-				self.generateJunctionVelocity(self.plannerQueue[-2], self.plannerQueue[-1])
-			
-			self.forwardPass()
-			self.reversePass()
-			
-			if len(self.plannerQueue) > self.queueSize:
-				self.updateAndRelease(self.plannerQueue.popleft())	#pops and releases the oldest move in the planner queue.
+			if newMoveObject.majorSteps > 0:	#only accept moves with a positive length
+				self.plannerQueue.append(newMoveObject)	#add new object to the move queue
+				
+				#if more than one item in the queue, calculate junction velocity
+				if len(self.plannerQueue)>1:
+					self.generateJunctionVelocity(self.plannerQueue[-2], self.plannerQueue[-1])
+				else:
+					newMoveObject.entryJunctionMaxStepRate = self.currentStepRate
+				
+				self.forwardPass()
+				self.reversePass()
+				
+				if len(self.plannerQueue) > self.queueSize:
+					self.updateAndRelease(self.plannerQueue.popleft())	#pops and releases the oldest move in the planner queue.
+			else:
+				self.release(newMoveObject)
 		
 		def generateJunctionVelocity(self, entryMoveObject, exitMoveObject):
 			'''Calculates the maximum junction velocity based on the pull in velocity limit and the directions of the entry and exit vectors.'''
@@ -160,6 +168,7 @@ class move(object):
 
 		def forwardPass(self):
 			thisSegment = self.plannerQueue[-1]
+				
 			#choose the entry velocity for the segment.
 			if len(self.plannerQueue)>1:
 				priorSegment = self.plannerQueue[-2]
@@ -181,6 +190,7 @@ class move(object):
 			thisSegment.forwardPassExitStepRate = self.velocityFromDistance(distance = thisSegment.accelSteps,
 																		initialVelocity = thisSegment.forwardPassEntryStepRate,
 																		acceleration = thisSegment.segmentAccelRate)
+
 
 		def reversePass(self):
 		
@@ -224,8 +234,10 @@ class move(object):
 			
 		def normalizeVector(self, inputVector):
 			totalLength = math.sqrt(sum([float(math.pow(axis, 2)) for axis in inputVector]))
-			return [float(axis)/totalLength for axis in inputVector]
-		
+			if totalLength > 0:
+				return [float(axis)/totalLength for axis in inputVector]
+			else: return [0 for axis in inputVector]	#prevent divide by zero errors by returning a unit vector 
+			
 		@staticmethod
 		def distanceFromVelocities(finalVelocity, initialVelocity, acceleration):
 			distance = round((math.pow(finalVelocity,2) - math.pow(initialVelocity,2))/(2*acceleration))
@@ -273,17 +285,22 @@ class move(object):
 			segment.update()
 			segment.release()
 		
+		def release(self, segment):
+			segment.release()
+		
 		def flushPlanner(self):
-			#release all objects in the queue
-			for moveObject in self.plannerQueue:
-				self.updateAndRelease(moveObject)
-			#clear the queue
-			self.plannerQueue.clear()
-			self.debugFile.close()
+			if len(self.plannerQueue)>0:
+				self.currentStepRate = self.plannerQueue[-1].reversePassExitStepRate	#store the closing step rate
+				#release all objects in the queue
+				for moveObject in self.plannerQueue:
+					self.updateAndRelease(moveObject)
+				#clear the queue
+				self.plannerQueue.clear()
+				self.debugFile.flush()
 	
 		def resetMachineState(self, velocity = 0.0, acceleration = 0.0):
-			self.currentVelocity = velocity
-			self.currentAcceleration = acceleration
+			self.currentStepRate = velocity
+			self.currentVelocity = 0
 			self.debugCount = 0
 		
 		def getMoveObject(self):
@@ -302,7 +319,7 @@ class moveObject(object):
 		self.positionCommand = position
 		self.velocityCommand = float(velocity)
 		if acceleration:
-			self.accelerationCommand = float(acceleration)
+			self.accelerationCommand = acceleration
 		else:
 			self.accelerationCommand = self.move.defaultAcceleration
 
@@ -341,14 +358,17 @@ class moveObject(object):
 		motorDeltas = [coordinates.uFloat(x - y, x.units) for (x,y) in zip(requestedMotorPositions, currentMotorPositions)]
 		self.actualMotorDeltas = [coordinates.uFloat(int(round(delta,0)), delta.units) for delta in motorDeltas]	#rounds steps down.
 		self.majorSteps = max([abs(delta) for delta in self.actualMotorDeltas])	#note: this gets used by the path planner
-		parameterRatio = float(self.majorSteps) / float(machineLength)	#this ratio relates velocities and accelerations between the coordinate systems
+		if machineLength != 0:
+			parameterRatio = float(self.majorSteps) / float(machineLength)	#this ratio relates velocities and accelerations between the coordinate systems
+		else:
+			parameterRatio = 0.0
 		
 		#calculate maximum step rates
 		self.segmentMaxStepRate = self.velocityCommand * parameterRatio		#units of steps/sec
 		
 		#motion planner parameters. These will be modified by the motion planner
 		self.entryJunctionMaxStepRate = 0	#default to zero in case this move is the first one
-		self.exitJunctionMaxStepRate = 0	#default to zero in case this move is the last one
+		self.exitJunctionMaxStepRate = 200	#need to fix this eventually, but a minimum rate is necessary to not stall the planner
 		self.forwardPassEntryStepRate = 0	#used by the forward pass of the path planner
 		self.forwardPassExitStepRate = 0
 		self.reversePassEntryStepRate = 0	#used by the reverse pass of the path planner
@@ -357,10 +377,9 @@ class moveObject(object):
 		self.decelSteps = 0
 		
 		if self.accelerationCommand.units == "mm/s^2":
-			self.segmentAccelRate = self.accelerationCommand * parameterRatio	#transform along major axis, now in steps^s^2000000000000000000000000000000000
+			self.segmentAccelRate = self.accelerationCommand * parameterRatio	#transform along major axis, now in steps^s^2
 		elif self.accelerationCommand.units == "steps/s^2":
 			self.segmentAccelRate = self.accelerationCommand	#motor inertia dominant, don't change.
-		
 		
 		#create actionObjects and commit to the channel priority queue
 		self.actionObjects = self.move.virtualNode.spinRequest(axesSteps = self.actualMotorDeltas, accelSteps = 0, decelSteps = 0, accelRate = 0, external = True)
@@ -378,9 +397,6 @@ class moveObject(object):
 		
 		newMachinePosition = self.move.kinematics.forward(transformedNewAxisPositions)
 		self.move.machinePosition.future.set(newMachinePosition)
-		
-		print "MACHINE POSITION:" + str(self.move.machinePosition.future())
-		print "MOTOR DELTAS:" + str(motorDeltas)
 		
 	
 	def commit(self):
