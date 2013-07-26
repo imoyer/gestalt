@@ -1,0 +1,138 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><title>Python: module utilities</title>
+</head><body bgcolor="#f0f0f8">
+
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="heading">
+<tr bgcolor="#7799ee">
+<td valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial">&nbsp;<br><big><big><strong>utilities</strong></big></big></font></td
+><td align=right valign=bottom
+><font color="#ffffff" face="helvetica, arial"><a href=".">index</a><br><a href="file:/home/nadya/Documents/CBA/gestalt/utilities.py">/home/nadya/Documents/CBA/gestalt/utilities.py</a></font></td></tr></table>
+    <p></p>
+<p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#aa55cc">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Modules</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#aa55cc"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><table width="100%" summary="list"><tr><td width="25%" valign=top><a href="ast.html">ast</a><br>
+</td><td width="25%" valign=top><a href="datetime.html">datetime</a><br>
+</td><td width="25%" valign=top><a href="math.html">math</a><br>
+</td><td width="25%" valign=top></td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ee77aa">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Classes</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#ee77aa"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl>
+<dt><font face="helvetica, arial"><a href="__builtin__.html#object">__builtin__.object</a>
+</font></dt><dd>
+<dl>
+<dt><font face="helvetica, arial"><a href="utilities.html#intelHexParser">intelHexParser</a>
+</font></dt><dt><font face="helvetica, arial"><a href="utilities.html#persistenceManager">persistenceManager</a>
+</font></dt></dl>
+</dd>
+</dl>
+ <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="intelHexParser">class <strong>intelHexParser</strong></a>(<a href="__builtin__.html#object">__builtin__.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Parses&nbsp;Intel&nbsp;Hex&nbsp;Files&nbsp;for&nbsp;Bootloading&nbsp;and&nbsp;Memory&nbsp;Programming.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="intelHexParser-__init__"><strong>__init__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="intelHexParser-checkAddressContinuity"><strong>checkAddressContinuity</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="intelHexParser-dataList"><strong>dataList</strong></a>(self, data)</dt></dl>
+
+<dl><dt><a name="intelHexParser-integerRecord"><strong>integerRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-loadHexFile"><strong>loadHexFile</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="intelHexParser-openHexFile"><strong>openHexFile</strong></a>(self, filename<font color="#909090">=None</font>)</dt></dl>
+
+<dl><dt><a name="intelHexParser-processDataRecord"><strong>processDataRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-processEndOfFileRecord"><strong>processEndOfFileRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-processExtendedLinearAddressRecord"><strong>processExtendedLinearAddressRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-processExtendedSegmentAddressRecord"><strong>processExtendedSegmentAddressRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-processStartLinearAddressRecord"><strong>processStartLinearAddressRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-processStartSegmentAddressRecord"><strong>processStartSegmentAddressRecord</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-recordParser"><strong>recordParser</strong></a>(self, record)</dt></dl>
+
+<dl><dt><a name="intelHexParser-resetParser"><strong>resetParser</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="intelHexParser-returnPages"><strong>returnPages</strong></a>(self, pageSize)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table> <p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#ffc8d8">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#000000" face="helvetica, arial"><a name="persistenceManager">class <strong>persistenceManager</strong></a>(<a href="__builtin__.html#object">__builtin__.object</a>)</font></td></tr>
+    
+<tr bgcolor="#ffc8d8"><td rowspan=2><tt>&nbsp;&nbsp;&nbsp;</tt></td>
+<td colspan=2><tt>Handles&nbsp;interacting&nbsp;with&nbsp;persistence&nbsp;files.<br>&nbsp;</tt></td></tr>
+<tr><td>&nbsp;</td>
+<td width="100%">Methods defined here:<br>
+<dl><dt><a name="persistenceManager-__call__"><strong>__call__</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="persistenceManager-__init__"><strong>__init__</strong></a>(self, filename<font color="#909090">=None</font>, namespace<font color="#909090">=None</font>)</dt></dl>
+
+<dl><dt><a name="persistenceManager-get"><strong>get</strong></a>(self, name)</dt></dl>
+
+<dl><dt><a name="persistenceManager-readPersistenceDictionary"><strong>readPersistenceDictionary</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="persistenceManager-set"><strong>set</strong></a>(self, name, value)</dt></dl>
+
+<dl><dt><a name="persistenceManager-writePersistenceDictionary"><strong>writePersistenceDictionary</strong></a>(self, persistenceDict)</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><tt>dictionary&nbsp;for&nbsp;instance&nbsp;variables&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><tt>list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object&nbsp;(if&nbsp;defined)</tt></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table width="100%" cellspacing=0 cellpadding=2 border=0 summary="section">
+<tr bgcolor="#eeaa77">
+<td colspan=3 valign=bottom>&nbsp;<br>
+<font color="#ffffff" face="helvetica, arial"><big><strong>Functions</strong></big></font></td></tr>
+    
+<tr><td bgcolor="#eeaa77"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td><td>&nbsp;</td>
+<td width="100%"><dl><dt><a name="-bytesToInt"><strong>bytesToInt</strong></a>(bytes)</dt></dl>
+ <dl><dt><a name="-intToBytes"><strong>intToBytes</strong></a>(integer, numbytes)</dt></dl>
+ <dl><dt><a name="-listToString"><strong>listToString</strong></a>(numList)</dt></dl>
+ <dl><dt><a name="-notice"><strong>notice</strong></a>(source<font color="#909090">=None</font>, message<font color="#909090">=''</font>)</dt><dd><tt>Sends&nbsp;a&nbsp;notice&nbsp;to&nbsp;the&nbsp;user.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>
+For&nbsp;now,&nbsp;this&nbsp;just&nbsp;prints&nbsp;to&nbsp;the&nbsp;screen.&nbsp;But&nbsp;eventually,&nbsp;could&nbsp;re-route&nbsp;via&nbsp;a&nbsp;web&nbsp;interface.</tt></dd></dl>
+ <dl><dt><a name="-vectorAbs"><strong>vectorAbs</strong></a>(vector)</dt></dl>
+ <dl><dt><a name="-vectorDivide"><strong>vectorDivide</strong></a>(vector1, vector2)</dt></dl>
+ <dl><dt><a name="-vectorInt"><strong>vectorInt</strong></a>(vector)</dt></dl>
+ <dl><dt><a name="-vectorLength"><strong>vectorLength</strong></a>(vector)</dt></dl>
+ <dl><dt><a name="-vectorMCUSign"><strong>vectorMCUSign</strong></a>(vector)</dt></dl>
+ <dl><dt><a name="-vectorMax"><strong>vectorMax</strong></a>(vector)</dt></dl>
+ <dl><dt><a name="-vectorMultiply"><strong>vectorMultiply</strong></a>(vector1, vector2)</dt></dl>
+ <dl><dt><a name="-vectorSign"><strong>vectorSign</strong></a>(vector)</dt></dl>
+</td></tr></table>
+</body></html>
