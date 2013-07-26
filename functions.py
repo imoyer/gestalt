@@ -382,7 +382,7 @@ class moveObject(object):
 			self.segmentAccelRate = self.accelerationCommand	#motor inertia dominant, don't change.
 		
 		#create actionObjects and commit to the channel priority queue
-		self.actionObjects = self.move.virtualNode.spinRequest(axesSteps = self.actualMotorDeltas, accelSteps = 0, decelSteps = 0, accelRate = 0, external = True)
+		self.actionObjects = self.move.virtualNode.spinRequest(axesSteps = tuple(self.actualMotorDeltas), accelSteps = 0, decelSteps = 0, accelRate = 0, external = True, majorSteps = self.majorSteps)	#note conversion to tuple.
 		self.actionObjects.commit()	#this will lock in their place in the transmit queue, however will not release until this move object is run thru the motion planner
 		
 		#commit self to the path planner.

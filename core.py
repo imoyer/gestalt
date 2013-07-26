@@ -125,8 +125,38 @@ class actionSequence(object):
 
 class actionSet(object):
 	'''Stores a set of actionObjects which should be executed simultaneously.'''
-	pass
+	def __init__(self, actionObjects):
+		self.actionObjects = actionObjects
+		
+	def commit(self):
+		for actionObject in self.actionObjects:
+			actionObject.commit()
+	
+	def update(self, *args, **kwargs):
+		for actionObject in self.actionObjects:
+			actionObject.update(*args, **kwargs)
+	def release(self, *args, **kwargs):
+		
+		for actionObject in self.actionObjects:
+			actionObject.release(*args, **kwargs)
+
 
 class syncToken(object):
 	'''Contains tokens used by nodes to synchronize with each other.'''
-	pass
+	def __init__(self):
+		self.tokens = {}
+		
+	def push(self, tokenName, tokenValue):
+		if tokenName in self.tokens:
+			#token exists, add a value to it.
+			self.tokens[tokenName] += [tokenValue]
+		else:
+			self.tokens.update({tokenName:[tokenValue]})
+	
+	def pull(self, tokenName):
+		if tokenName in self.tokens:
+			return self.tokens[tokenName]
+		else:
+			return None
+			
+			
