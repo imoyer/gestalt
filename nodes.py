@@ -673,15 +673,20 @@ class compoundNode(object):
 					for node in nodeKWarguments:
 						node.update({key: value})
 			
-			#if sync, provide a sync token
-#			if self.sync:
-#				syncToken = core.syncToken()	#pull a new sync token
-#				for node in nodeKWarguments:
-#					node.update({'sync':syncToken})
-			#make function calls
+#			if sync, provide a sync token
+			if self.sync:
+				syncToken = core.syncToken()	#pull a new sync token
+				for node in nodeKWarguments:
+					node.update({'sync':syncToken})
+					
+#			make function calls
 			returnValues = [self.nodeFunctionCall(node, self.attribute, args, kwargs) for node, args, kwargs in zip(self.compoundNode.nodes, nodeArguments, nodeKWarguments)]
 			
-			return core.actionSet(returnValues)
+			
+			if self.sync:
+				return core.actionSet(returnValues)
+			else:
+				return returnValues
 
 
 		def nodeFunctionCall(self, node, attribute, args, kwargs):

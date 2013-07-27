@@ -4,6 +4,7 @@
 
 #--IMPORTS-----
 import threading
+from functools import partial	#currying for forwarding function calls to actionObjects
 from gestalt.utilities import notice as notice
 
 class actionObject(object):
@@ -103,6 +104,7 @@ class actionObject(object):
 class actionSequence(object):
 	'''Stores a series of action objects which should get executed sequentially.'''
 	def __init__(self, actionObjects = None, parent = None):
+		self._type_ = 'actionSequence'
 		self.actionObjects = actionObjects
 		self.parent = parent	#this is the spawning action object
 	
@@ -126,20 +128,78 @@ class actionSequence(object):
 class actionSet(object):
 	'''Stores a set of actionObjects which should be executed simultaneously.'''
 	def __init__(self, actionObjects):
-		self.actionObjects = actionObjects
+		self.clearToRelease = threading.Event()	#when set, this flag indicates that the actionSet is cleared to gain channel access
+		#synchronize all action objects
+		for actionObject in actionObjects: actionObject.syncPush()
+		self.actionObjects = [actionObject.syncPull() for actionObject in actionObjects]	
+		self._type_ = 'actionSet'
+		self.interface = actionObjects[0].interface
 		
 	def commit(self):
-		for actionObject in self.actionObjects:
-			actionObject.commit()
+		self.interface.commit(self)
 	
-	def update(self, *args, **kwargs):
-		for actionObject in self.actionObjects:
-			actionObject.update(*args, **kwargs)
-	def release(self, *args, **kwargs):
-		
-		for actionObject in self.actionObjects:
-			actionObject.release(*args, **kwargs)
+	def release(self):
+		self.clearToRelease.set()
+		return True
+	
+	def isReleased(self):
+		return self.clearToRelease.is_set()
+	
+	def __getattr__(self, attribute):
+		return partial(distributeFunctionCall, _attribute_ = attribute, _actionObjects_ = self.actionObjects)
 
+
+def distributeFunctionCall(*args, **kwargs):
+	'''Distributes a function call to _attribute_ amongst the provided actionObjects.
+	
+	Any arg or kwarg provided as a tuple is distributed uniquely to the actionObjects. Otherwise the parameter
+	is copied to all actionObjects.'''
+	attribute = kwargs['_attribute_']
+	actionObjects = kwargs['_actionObjects_']
+	kwargs.pop('_attribute_')
+	kwargs.pop('_actionObjects_')
+	objectArguments = [[] for i in range(len(actionObjects))]	#a list of arguments for each actionObject
+	objectKWArguments = [{} for i in range(len(actionObjects))]	#a list of keyword arguments for each actionObject
+
+	#compile arguments
+	for argument in args:
+		if type(argument) == tuple:	#tuple provided, should distribute
+			if len(argument) != len(self.actionObjects):
+				alert('actionSet', self.attribute + ': not enough arguments provided in tuple.')
+				return False
+			else:
+				for objectArgPair in zip(objectArguments, list(argument)):	#iterate thru (targetArgumentList, argument)
+					currentObjectArguments = objectArgPair[0]
+					currentObjectArguments += [objectArgPair[1]]
+		else:	#copy argument to all actionObjects
+			for currentObjectArguments in objectArguments:
+				currentObjectArguments += [argument]
+
+	#compile keyward arguments
+	for key, value in kwargs.iteritems():
+		if type(value) == tuple:	#tuple provided, should distribute
+			if len(value) != len(self.actionObjects):
+				alert('actionSet', self.attribute + ': not enough arguments provided in tuple.')
+				return False
+			else:
+				for objectArgPair in zip(objectKWArguments, list(value)):
+					currentObjectArguments = objectArgPair[0]
+					currentObjectArguments.update({key:objectArgPair[1]})
+		else:
+			for currentObjectArguments in objectKWArguments:
+				currentObjectArguments.update({key: value})
+	
+	return [functionCall(actionObject, attribute, args, kwargs) for actionObject, args, kwargs in zip(actionObjects, objectArguments, objectKWArguments)]
+
+
+def functionCall(callObject, attribute, args, kwargs):
+	'''Calls callObject.attribute(*args, **kwargs)'''
+	
+	if hasattr(callObject, attribute):
+		return getattr(callObject, attribute)(*list(args), **kwargs)
+	else:
+		notice(callObject, "actionObject DOESN'T HAVE REQUESTED ATTRIBUTE")
+		raise AttributeError(attribute)		
 
 class syncToken(object):
 	'''Contains tokens used by nodes to synchronize with each other.'''

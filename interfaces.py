@@ -7,6 +7,7 @@ import time
 import Queue
 import threading
 import socket
+import itertools
 from gestalt.utilities import notice
 from gestalt import packets
 from gestalt import functions
@@ -502,8 +503,22 @@ class gestaltInterface(baseInterface):
 		def serialize(self, actionObject):
 			'''serializes actionSets into actionObjects.'''
 			if actionObject._type_ == 'actionObject': return [actionObject]	#note _type_ is defined in the actionObject class
-			#put handler for core.actionSet here once ready.
+			if actionObject._type_ == 'actionSet':
+				if actionObject.actionObjects[0]._type_ == 'actionObject':
+					#actionSet contains actionObjects rather than actionSequences
+					actionObjectStream = [thisActionObject for thisActionObject in actionObject.actionObjects]
+					actionObjectStream += [actionObject.actionObjects[0].virtualNode.syncRequest()]	#generates a syncRequest.
+					return actionObjectStream
+				if actionObject.actionObjects[0]._type_ == 'actionSequence':
+					actionObjectStream = []
+					actionSequences = [actionSequence.actionObjects for actionSequence in actionObject.actionObjects]
+					syncLists = zip(*actionSequences)	#takes parallel slices of actionObjects in the provided actionSequences.
+					for syncList in syncLists:
+						actionObjectStream += syncList
+						actionObjectStream += [syncList[0].virtualNode.syncRequest()]
+					return actionObjectStream
 			return []
+					
 			
 		def getActionObject(self):
 			try:
