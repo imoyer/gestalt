@@ -368,7 +368,7 @@ class moveObject(object):
 		
 		#motion planner parameters. These will be modified by the motion planner
 		self.entryJunctionMaxStepRate = 0	#default to zero in case this move is the first one
-		self.exitJunctionMaxStepRate = 200	#need to fix this eventually, but a minimum rate is necessary to not stall the planner
+		self.exitJunctionMaxStepRate = 200	#need to fix this eventually, but a minimum rate is necessary to not stall the planner. This is the min exit rate.
 		self.forwardPassEntryStepRate = 0	#used by the forward pass of the path planner
 		self.forwardPassExitStepRate = 0
 		self.reversePassEntryStepRate = 0	#used by the reverse pass of the path planner
