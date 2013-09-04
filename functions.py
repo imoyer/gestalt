@@ -62,7 +62,7 @@ class jog(object):
 		return self.move(jogPosition, velocity, acceleration)
 				
 class move(object):
-	def __init__(self, virtualMachine = None, virtualNode = None, axes = None, kinematics = None, machinePosition = None, defaultAcceleration = coordinates.uFloat(2000, "steps/s^2"), pullInSpeed = 4000):
+	def __init__(self, virtualMachine = None, virtualNode = None, axes = None, kinematics = None, machinePosition = None, defaultAcceleration = coordinates.uFloat(2000, "steps/s^2"), pullInSpeed = 4000, planner = None):
 		'''Configures the move object.'''
 		
 		#convert inputs to lists where appropriate
@@ -80,9 +80,13 @@ class move(object):
 										#The default was chosen because a 400 step/rev stepper motor with 51oz-in driven at 24V and driving a small mechanical
 										#load thru an 18T MXL pulley could pull in at 200mm/s or 2200 steps/sec. Assuming microstepping of 4, the pull-in speed
 										#derated by 50% is 4000 uSteps/sec. 
-		
-		#configure and start motion planner
-		self.planner = self.motionPlanner(self)	#multi-block lookahead motion planner instance
+
+		#configure and start motion planner										
+		if planner == 'null':
+			self.planner = self.nullMotionPlanner(self)
+		else:	#use default planner
+			self.planner = self.motionPlanner(self)	#multi-block lookahead motion planner instance
+
 		self.planner.daemon = True
 		self.planner.start()
 		
@@ -310,7 +314,67 @@ class move(object):
 			except:
 				return False, None
 			
+	class nullMotionPlanner(threading.Thread):	#performs no path planning, just releases objects as they arrive
+		def __init__(self, move, queueSize = 50, queueTimeout = 0.1):
+			threading.Thread.__init__(self)
+			
+			self.move = move	#link to parent move function
+			self.idleTime = 0.0005	#seconds
+			self.queueTimeoutCycles = int(queueTimeout/self.idleTime)
+			self.queueSize = queueSize
+			self.timeoutCount = 0	#when this equals queueTimeoutCycles, the queue is flushed
+			
+			self.plannerInput = Queue.Queue(1)	#only permit one input at a time.
+			self.plannerQueue = collections.deque()
+			self.resetMachineState()
+			
+			self.debugFile = open('motionPlannerDebugFile.txt', 'w')
+			
+		def run(self):
+			while True:
+				queueState, newMoveObject = self.getMoveObject()	#try to fetch a new move object
+				if queueState:
+					self.processMoves(newMoveObject)
+					self.timoutCount = 0
+				else:
+					self.timeoutCount += 1
+					if self.timeoutCount == self.queueTimeoutCycles:
+						self.flushPlanner()
+						self.timeoutCount = 0
+				time.sleep(self.idleTime)
+
+		def addMove(self, newMoveObject):
+			'''Adds a new move to the motion planner queue.'''
+			self.plannerInput.put(newMoveObject)
+			return
+
+		def processMoves(self, newMoveObject):
+				self.release(newMoveObject)
 		
+		def release(self, segment):
+			segment.release()
+		
+		def flushPlanner(self):
+			if len(self.plannerQueue)>0:
+				self.currentStepRate = self.plannerQueue[-1].reversePassExitStepRate	#store the closing step rate
+				#release all objects in the queue
+				for moveObject in self.plannerQueue:
+					self.updateAndRelease(moveObject)
+				#clear the queue
+				self.plannerQueue.clear()
+				self.debugFile.flush()
+	
+		def resetMachineState(self, velocity = 0.0, acceleration = 0.0):
+			self.currentStepRate = velocity
+			self.currentVelocity = 0
+			self.debugCount = 0
+		
+		def getMoveObject(self):
+			'''Will attempt to retrieve a new move object from the planner queue.'''
+			try: 
+				return True, self.plannerInput.get(block=False)
+			except:
+				return False, None		
 
 class moveObject(object):
 	def __init__(self, move, position = None, velocity = None, acceleration = None):

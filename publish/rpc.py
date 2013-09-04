@@ -51,7 +51,9 @@ class fileRPCDispatch(object):
 			except:
 				print sys.exc_info()
 				
-			
+	def reset(self):
+		pass
+	
 	def executeLine(self, line):
 		'''Reads a string input and parses and then executes.'''
 		
@@ -119,8 +121,10 @@ class httpRPCDispatch(object):
 		allowAllOrigins = False		#this is useful for debugging
 		jsonEncoder = json.JSONEncoder()
 		
+		def log_message(self, format, *args): #comment out this function if want to see log in terminal
+			return
+		
 		def do_GET(self):
-			
 			inboundIP, inboundPort = self.client_address	#this should be from the user's browser (127.0.0.1).
 			requestHeaders = dict(self.headers.items())
 			if 'origin' in requestHeaders:

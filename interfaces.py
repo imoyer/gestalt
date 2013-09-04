@@ -124,7 +124,7 @@ class devInterface(baseInterface):
 		
 class serialInterface(devInterface):
 	'''Provides an interface to nodes connected thru a serial port on the host machine.'''
-	def __init__(self, baudRate, portName = None, interfaceType = None, owner = None, timeOut = 0.2):
+	def __init__(self, baudRate, portName = None, interfaceType = None, owner = None, timeOut = 0.2, flowControl = None):
 		self.baudRate = baudRate
 		self.portName = portName
 		self.timeOut = timeOut
