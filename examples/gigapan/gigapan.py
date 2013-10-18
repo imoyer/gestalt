@@ -18,7 +18,7 @@ from gestalt.publish import rpc	#remote procedure call dispatcher
 import time
 import cv2.cv as cv
 import sys
-import random
+import time
 
 #------VIRTUAL MACHINE------
 class virtualMachine(machines.virtualMachine):
@@ -70,15 +70,19 @@ class virtualMachine(machines.virtualMachine):
 	def autofocus(self):
 		pass
 		
-	def takePhoto(self):
+	def takePhoto(self, capture, x, y):
 		for i in range(NUMCAMERAREADS):
 		#the buffer of images needs to be constantly emptied or you get an old image
     			img = cv.QueryFrame(capture)
+			time.sleep(.1)
     		cv.ShowImage("camera", img)
-		cv.SaveImage("hi"+str(random.random())[2:]+".jpeg", img)
-		
-	def takeGigapan(self, vm, capture):
-		vm.jog([1.2,0,0])
+		cv.SaveImage("images/hi"+str(x)+"."+str(y)+".jpeg", img)
+		#cv.SaveImage("images/hi"+str(time.time())[6:]+".jpeg", img)
+
+	
+	def nextImageLoc(self, vm, gigapan, x, y):
+		print "moving to %i %i"%(x,y)
+		vm.move([x,y,0],0) #FIX this is a dummy velocity 0
 		#wait for the motor to be still
 		vm_status = vm.xAxisNode.spinStatusRequest()
 		while vm_status['stepsRemaining'] > 0:
@@ -87,24 +91,43 @@ class virtualMachine(machines.virtualMachine):
 			# don't stall the UI while waiting
     			if cv.WaitKey(10) == 27:
         			break
-		self.takePhoto()
+
+	def takeGigapan(self, vm, capture):
+		gig = gigapan(0,0,10,10,1,1) # x0,y0,x1,y1,imgsizex,imgsizey
+		locs = gig.locations()
+		for (x,y) in locs:
+			self.nextImageLoc(vm, gig, x, y)
+			self.takePhoto(capture, x, y)
 		
 		
 
 class gigapan():
 	'''A grid of images and their corresponding moves'''
 	
-	def __init__(self, x0, y0, x1, y1, image_size):
+	def __init__(self, x0, y0, x1, y1, image_sizex, image_sizey):
 		self.x0 = x0
 		self.y0 = y0
 		self.x1 = x1
 		self.y1 = y1		
-		self.image_size = image_size
-		self.currentx = 0
-		self.currenty = 0
+		self.image_sizex = image_sizex
+		self.image_sizey = image_sizey
+		self.x = 0.0
+		self.y = 0.0
 
 	def next_move(self):
-		pass
+		self.currentx = self.currentx + self.incrementx
+		self.currenty = self.currenty + self.incrementy
+		return (x,y)
+
+	def locations(self):
+		binsx = self.x1-self.x0/self.image_sizex
+		binsy = self.y1-self.y0/self.image_sizey
+		locations = []
+		for i in range(0, binsx):
+			for j in range(0, binsy):
+				locations.append((i*self.image_sizex, j*self.image_sizey))
+		return locations
+			
 		
 
 
@@ -135,10 +158,12 @@ if __name__ == '__main__':
 	#rpcDispatch.start()
 	
 	
-	capture = cv.CaptureFromCAM(1)
-	while True:
-		gigmachine.takeGigapan(gigmachine, capture)
-    		if cv.WaitKey(10) == 27:
-        		break
+	capture = cv.CaptureFromCAM(2)
+	gigmachine.takeGigapan(gigmachine,capture)
+
+	#while True:
+	#	gigmachine.takeGigapan(gigmachine, capture)
+    	#	if cv.WaitKey(10) == 27:
+        #		break
 
 
