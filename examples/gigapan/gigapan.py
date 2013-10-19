@@ -13,6 +13,7 @@ from gestalt.publish import rpc	#remote procedure call dispatcher
 import time
 import cv2.cv as cv
 import sys
+import time
 
 #------VIRTUAL MACHINE------
 class virtualMachine(machines.virtualMachine):
@@ -74,6 +75,15 @@ class virtualMachine(machines.virtualMachine):
 
 	def autofocus(self):
 		pass
+		
+	def takePhoto(self, capture, x, y):
+		for i in range(NUMCAMERAREADS):
+		#the buffer of images needs to be constantly emptied or you get an old image
+    			img = cv.QueryFrame(capture)
+			time.sleep(.1)
+    		cv.ShowImage("camera", img)
+		cv.SaveImage("images/hi"+str(x)+"."+str(y)+".jpeg", img)
+		#cv.SaveImage("images/hi"+str(time.time())[6:]+".jpeg", img)
 
         def captureUndistortMap():
                 pass
@@ -140,29 +150,77 @@ class virtualMachine(machines.virtualMachine):
                         self.barMove([0,0,step])
                         focalstack.append(self.takePhoto())
                 return focalstack
+	
+	def nextImageLoc(self, vm, gigapan, x, y):
+		print "moving to %i %i"%(x,y)
+		vm.move([x,y,0],0) #FIX this is a dummy velocity 0
+		#wait for the motor to be still
+		vm_status = vm.xAxisNode.spinStatusRequest()
+		while vm_status['stepsRemaining'] > 0:
+			time.sleep(0.1)
+			vm_status = vm.xAxisNode.spinStatusRequest()
+			# don't stall the UI while waiting
+    			if cv.WaitKey(10) == 27:
+        			break
 
+	def takeGigapan(self, vm, capture):
+		gig = gigapan(0,0,10,10,1,1) # x0,y0,x1,y1,imgsizex,imgsizey
+		locs = gig.locations()
+		for (x,y) in locs:
+			self.nextImageLoc(vm, gig, x, y)
+			self.takePhoto(capture, x, y)
+		
+		
 
+class gigapan():
+	'''A grid of images and their corresponding moves'''
+	
+	def __init__(self, x0, y0, x1, y1, image_sizex, image_sizey):
+		self.x0 = x0
+		self.y0 = y0
+		self.x1 = x1
+		self.y1 = y1		
+		self.image_sizex = image_sizex
+		self.image_sizey = image_sizey
+		self.x = 0.0
+		self.y = 0.0
+
+	def next_move(self):
+		self.currentx = self.currentx + self.incrementx
+		self.currenty = self.currenty + self.incrementy
+		return (x,y)
+
+	def locations(self):
+		binsx = self.x1-self.x0/self.image_sizex
+		binsy = self.y1-self.y0/self.image_sizey
+		locations = []
+		for i in range(0, binsx):
+			for j in range(0, binsy):
+				locations.append((i*self.image_sizex, j*self.image_sizey))
+		return locations
+			
 #------IF RUN DIRECTLY FROM TERMINAL------
 if __name__ == '__main__':
 	gigapan = virtualMachine(persistenceFile = "test.vmp", camnum = 2)
 #	gigapan.xyzNode.setMotorCurrent(1.1)
 #	gigapan.xyzNode.loadProgram(HEXFILE)
 	gigapan.xyzNode.setVelocityRequest(2)
-	gigapan.xyzNode.setMotorCurrent(1)
+#	gigapan.xyzNode.setMotorCurrent(1)
 	fileReader = rpc.fileRPCDispatch()
-	fileReader.addFunctions(('move',gigapan.move), ('jog', gigapan.jog))	#expose these functions on the file reader interface.
+	fileReader.addFunctions(('move',gigmachine.move), ('jog', gigmachine.jog))	#expose these functions on the file reader interface.
 
 
 	# remote procedure call initialization
+	# uncomment if you want to use the tq.mit.edu/pathfinder interface
 	#rpcDispatch = rpc.httpRPCDispatch(address = '0.0.0.0', port = 27272)
-	#notice(gigapan, 'Started remote procedure call dispatcher on ' + str(rpcDispatch.address) + ', port ' + str(rpcDispatch.port))
-	#rpcDispatch.addFunctions(('move',gigapan.move),
-	#			('position', gigapan.getPosition),
-	#			('jog', gigapan.jog),
-	#			('disableMotors', gigapan.xyzNode.disableMotorsRequest),
+	#notice(gigmachine, 'Started remote procedure call dispatcher on ' + str(rpcDispatch.address) + ', port ' + str(rpcDispatch.port))
+	#rpcDispatch.addFunctions(('move',gigmachine.move),
+	#			('position', gigmachine.getPosition),
+	#			('jog', gigmachine.jog),
+	#			('disableMotors', gigmachine.xyzNode.disableMotorsRequest),
 	#			('loadFile', fileReader.loadFromURL),
 	#			('runFile', fileReader.runFile),
-	#			('setPosition', gigapan.setPosition))	#expose these functions on an http interface
+	#			('setPosition', gigmachine.setPosition))	#expose these functions on an http interface
 	#rpcDispatch.addOrigins('http://tq.mit.edu', 'http://127.0.0.1:8000')	#allow scripts from these sites to access the RPC interface
 	#rpcDispatch.allowAllOrigins()
 	#rpcDispatch.start()
@@ -174,3 +232,8 @@ if __name__ == '__main__':
 
     		if cv.WaitKey(10) == 27:
         		break
+	#while True:
+	#	gigmachine.takeGigapan(gigmachine, capture)
+    	#	if cv.WaitKey(10) == 27:
+        #		break
+
