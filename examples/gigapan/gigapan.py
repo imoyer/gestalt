@@ -1,10 +1,5 @@
 # Forked from DFUnitVM Oct 2013
 
-PORT = '/dev/ttyUSB0'
-HEXFILE = '../../../086-005/086-005a.hex'
-# tune this depending on how many frames are captured during the move
-NUMCAMERAREADS = 15
-
 #------IMPORTS-------
 from gestalt import nodes
 from gestalt import interfaces
@@ -21,10 +16,22 @@ import sys
 
 #------VIRTUAL MACHINE------
 class virtualMachine(machines.virtualMachine):
-	
+
+        def __init__(self,camnum):
+                self.camnum = camnum
+                cv.NamedWindow("camera", 1)
+                self.capture = cv.CaptureFromCAM(self.camnum)
+                self.PORT = '/dev/ttyUSB0'
+                self.HEXFILE = '../../../086-005/086-005a.hex'
+                # tune this depending on how many frames are captured during the move
+                self.NUMCAMERAREADS = 15
+                
+                # TODO check and store undistortion info
+                self.undistortinfo = False
+
 	def initInterfaces(self):
 		if self.providedInterface: self.fabnet = self.providedInterface		#providedInterface is defined in the virtualMachine class.
-		else: self.fabnet = interfaces.gestaltInterface('FABNET', interfaces.serialInterface(baudRate = 115200, interfaceType = 'ftdi', portName = PORT))
+		else: self.fabnet = interfaces.gestaltInterface('FABNET', interfaces.serialInterface(baudRate = 115200, interfaceType = 'ftdi', portName = self.PORT))
 		
 	def initControllers(self):
 		self.xAxisNode = nodes.networkedGestaltNode('X Axis', self.fabnet, filename = '086-005a.py', persistence = self.persistence)
@@ -58,29 +65,86 @@ class virtualMachine(machines.virtualMachine):
 	
 	def getPosition(self):
 		return {'position':self.position.future()}
-	
+                
 	def setPosition(self, position  = [None, None, None]):
 		self.position.future.set(position)
-
-#	def setSpindleSpeed(self, speedFraction):
-#		self.machineControl.pwmRequest(speedFraction)
-#		pass
+        
+        def setLightIntensity(self):
+                pass
 
 	def autofocus(self):
 		pass
 
+        def captureUndistortMap():
+                pass
+
+        def initUndistort()
+                #load camera intrinsic params
+                #get optimal camera matrix (cv2 equiv)
+                #init undistorm rectify map (cv2 equiv)
+                #store it
+                pass
+
+        def correctImage(self,img):
+                if(not undistortmap):
+                        #capture undistort map
+                        #init undistort map
+                        undistortmap = True
+                #remap image
+                return img
+
 	def takePhoto(self):
-		pass
+       		for i in range(NUMCAMERAREADS):
+                        img = cv.QueryFrame(self.capture)
+                return correctImg(img)
 
 	def takeGigapan(self):
+                #move to each location and take image
+                #nadya did this already?
 		pass
 
+        def stitchGigapan(self,gigastack):
+                #rectify/correct all images
+                #create large canvas
+                #place all images in canvas
+                #blending?
+                pass
 
+        def bar(self):
+		gigapan_status = self.xAxisNode.spinStatusRequest()
+		while gigapan_status['stepsRemaining'] > 0:
+			time.sleep(0.1)
+			gigapan_status = self.xAxisNode.spinStatusRequest()
+			# don't stall the UI while waiting
+    			if cv.WaitKey(10) == 27:
+        			break
+        
+        def barMove(self,pos):
+                curr = self.getPosition()
+                #this is stupid but I can't remember map syntax w/o google
+                a = curr['position']
+                for i in range(len(pos)):
+                        pos[i]+=a[i]
+                barMoveAbs(pos)
+
+        def barMoveAbs(self,pos):
+                setPosition(pos)
+                bar()
+
+        def takeFocalStack(self,rangetop,rangebottom,nstack):
+                r = rangetop-rangebottom
+                step = r/nstack
+                focalstack = []
+                self.barMove((0,0,-r/2));
+                for pos in range(1,nstack):
+                        self.barMove([0,0,step])
+                        focalstack.append(self.takePhoto())
+                return focalstack
 
 
 #------IF RUN DIRECTLY FROM TERMINAL------
 if __name__ == '__main__':
-	gigapan = virtualMachine(persistenceFile = "test.vmp")
+	gigapan = virtualMachine(persistenceFile = "test.vmp", camnum = 2)
 #	gigapan.xyzNode.setMotorCurrent(1.1)
 #	gigapan.xyzNode.loadProgram(HEXFILE)
 	gigapan.xyzNode.setVelocityRequest(2)
@@ -103,28 +167,10 @@ if __name__ == '__main__':
 	#rpcDispatch.allowAllOrigins()
 	#rpcDispatch.start()
 
-	cv.NamedWindow("camera", 1)
-
-	capture = cv.CaptureFromCAM(2)
-
-	gigapan.jog([0,0,-0.1])
-	time.sleep(1)
-	sys.exit()
-
 	while True:
-		for i in range(NUMCAMERAREADS):
-    			img = cv.QueryFrame(capture)
+                img = gigapan.getCurrentFrame()
     		cv.ShowImage("camera", img)
-		gigapan.jog([-1.2,0,0])
-		gigapan_status = gigapan.xAxisNode.spinStatusRequest()
-		while gigapan_status['stepsRemaining'] > 0:
-			time.sleep(0.1)
-			gigapan_status = gigapan.xAxisNode.spinStatusRequest()
-			# don't stall the UI while waiting
-    			if cv.WaitKey(10) == 27:
-        			break
+		gigapan.barMove([-1.2,0,0])
 
     		if cv.WaitKey(10) == 27:
         		break
-
-
