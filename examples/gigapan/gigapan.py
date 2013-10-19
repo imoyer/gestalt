@@ -12,6 +12,7 @@ from gestalt.utilities import notice
 from gestalt.publish import rpc	#remote procedure call dispatcher
 import time
 import cv2.cv as cv
+import cv2
 import sys
 import time
 
@@ -20,15 +21,21 @@ class virtualMachine(machines.virtualMachine):
 
         def __init__(self,camnum):
                 self.camnum = camnum
-                cv.NamedWindow("camera", 1)
+                self.windowname = "camera"
+                cv.NamedWindow(self.windowname, 1)
                 self.capture = cv.CaptureFromCAM(self.camnum)
                 self.PORT = '/dev/ttyUSB0'
                 self.HEXFILE = '../../../086-005/086-005a.hex'
                 # tune this depending on how many frames are captured during the move
                 self.NUMCAMERAREADS = 15
+
+                self.calibtarget_dim = (7,4)
                 
                 # TODO check and store undistortion info
                 self.undistortinfo = False
+
+        def __del__(self):
+                cv.DestroyWindow(self.windowname)
 
 	def initInterfaces(self):
 		if self.providedInterface: self.fabnet = self.providedInterface		#providedInterface is defined in the virtualMachine class.
@@ -76,19 +83,31 @@ class virtualMachine(machines.virtualMachine):
 	def autofocus(self):
 		pass
 		
-	def takePhoto(self, capture, x, y):
+	def takePhoto(self, showImg=False, saveImg=False):
 		for i in range(NUMCAMERAREADS):
 		#the buffer of images needs to be constantly emptied or you get an old image
-    			img = cv.QueryFrame(capture)
+    			img = cv.QueryFrame(self.capture)
 			time.sleep(.1)
-    		cv.ShowImage("camera", img)
-		cv.SaveImage("images/hi"+str(x)+"."+str(y)+".jpeg", img)
-		#cv.SaveImage("images/hi"+str(time.time())[6:]+".jpeg", img)
+                img = self.correctImg(img)
+                if(showImg):
+                        cv.ShowImage(self.windowname, img)
+                if(saveImg):
+                        pos = self.getPosition()
+                        cv.SaveImage("images/hi%.03f-%.03f-%.03f.jpg", img) % pos
+                        #cv.SaveImage("images/hi"+str(time.time())[6:]+".jpeg", img)
+                return img
 
-        def captureUndistortMap():
-                pass
+        def captureUndistortMap(self):
+                img = cv.QueryFrame(self.capture)
+                cv.ShowImage(self.windowname,img)
+                [found corners] = cv2.findCirclesGrid(img, self.calibtarget_dim, flags = cv2.CALIB_CB_ASYMMETRIC_GRID)
+                cv2.drawChessboardCorners(img, self.calibtarget_dim, corners, found)
 
-        def initUndistort()
+                if cv.WaitKey(10) & 0xff == 'c':
+                        return (corners)
+
+        def initUndistort(self)
+                captured_corners = [cv2.findCirclesGrid(img, self.calibtarget_dim, flags = cv2.CALIB_CB_ASYMMETRIC_GRID) for img in captured_image_list]
                 #load camera intrinsic params
                 #get optimal camera matrix (cv2 equiv)
                 #init undistorm rectify map (cv2 equiv)
@@ -102,11 +121,6 @@ class virtualMachine(machines.virtualMachine):
                         undistortmap = True
                 #remap image
                 return img
-
-	def takePhoto(self):
-       		for i in range(NUMCAMERAREADS):
-                        img = cv.QueryFrame(self.capture)
-                return correctImg(img)
 
 	def takeGigapan(self):
                 #move to each location and take image
@@ -201,11 +215,11 @@ class gigapan():
 			
 #------IF RUN DIRECTLY FROM TERMINAL------
 if __name__ == '__main__':
-	gigapan = virtualMachine(persistenceFile = "test.vmp", camnum = 2)
-#	gigapan.xyzNode.setMotorCurrent(1.1)
-#	gigapan.xyzNode.loadProgram(HEXFILE)
-	gigapan.xyzNode.setVelocityRequest(2)
-#	gigapan.xyzNode.setMotorCurrent(1)
+	gigamachine = virtualMachine(persistenceFile = "test.vmp", camnum = 2)
+#	gigamachine.xyzNode.setMotorCurrent(1.1)
+#	gigamachine.xyzNode.loadProgram(HEXFILE)
+	gigamachine.xyzNode.setVelocityRequest(2)
+#	gigamachine.xyzNode.setMotorCurrent(1)
 	fileReader = rpc.fileRPCDispatch()
 	fileReader.addFunctions(('move',gigmachine.move), ('jog', gigmachine.jog))	#expose these functions on the file reader interface.
 
@@ -226,9 +240,9 @@ if __name__ == '__main__':
 	#rpcDispatch.start()
 
 	while True:
-                img = gigapan.getCurrentFrame()
-    		cv.ShowImage("camera", img)
-		gigapan.barMove([-1.2,0,0])
+                img = gigamachine.getCurrentFrame()
+    		cv.ShowImage(gigamachine.windowname, img)
+		gigamachine.barMove([-1.2,0,0])
 
     		if cv.WaitKey(10) == 27:
         		break
