@@ -1,8 +1,7 @@
-# Desktop Factory Unit Virtual Machine
-# Built Using Gestalt
-
-# (C) 2013 ILAN E. MOYER and the MIT CADLAB
-
+# Forked from DFUnitVM Oct 2013
+# set portname
+# set location of hex file for bootloader
+#
 
 #------IMPORTS-------
 from gestalt import nodes
@@ -34,15 +33,14 @@ class virtualMachine(machines.virtualMachine):
 		self.position = state.coordinate(['mm','mm','mm'])	#X,Y,Z
 	
 	def initKinematics(self):
-		self.xAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(0.9), elements.pulley.forward(11.6), elements.invert.forward(True)])
-		self.yAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(0.9), elements.pulley.forward(11.6), elements.invert.forward(True)])
-		self.zAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(2.54), elements.invert.forward(False)])
+		self.xAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(2), elements.invert.forward(False)])
+		self.yAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(2), elements.invert.forward(False)])
+		self.zAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(2), elements.invert.forward(False)])
 
 		self.stageKinematics = kinematics.direct(3)	#direct drive on all three axes
 	
 	def initFunctions(self):
-		self.move = functions.move(virtualMachine = self, virtualNode = self.xyzNode, axes = [self.xAxis, self.yAxis, self.zAxis], kinematics = self.stageKinematics, machinePosition = self.position,
-								planner = 'null')
+		self.move = functions.move(virtualMachine = self, virtualNode = self.xyzNode, axes = [self.xAxis, self.yAxis, self.zAxis], kinematics = self.stageKinematics, machinePosition = self.position,planner = 'null')
 		self.jog = functions.jog(self.move)	#an incremental wrapper for the move function
 		pass
 		
@@ -69,21 +67,27 @@ class virtualMachine(machines.virtualMachine):
 if __name__ == '__main__':
 	desktopFactory = virtualMachine(persistenceFile = "test.vmp")
 #	desktopFactory.xyzNode.setMotorCurrent(1.1)
-	desktopFactory.xyzNode.loadProgram('../../../086-005/086-005a.hex')
-	desktopFactory.xyzNode.setVelocityRequest(2)
+	#desktopFactory.xyzNode.loadProgram('../../../086-005/086-005a.hex')
+	desktopFactory.xyzNode.setVelocityRequest(8)
+	#desktopFactory.xyzNode.setMotorCurrent(1)
 	fileReader = rpc.fileRPCDispatch()
-	fileReader.addFunctions(('move',desktopFactory.move),
-							('jog', desktopFactory.jog))	#expose these functions on the file reader interface.
-
+	fileReader.addFunctions(('move',desktopFactory.move), ('jog', desktopFactory.jog))	#expose these functions on the file reader interface.
+	desktopFactory.move([10,10,10],0)
+	desktopFactory.move([-10,-10,-10],0)
+	#desktopFactory.move([30,10,0],0)
+	#desktopFactory.move([20,0,0],0)
+	#desktopFactory.move([10,10,0],0)
+	#time.sleep(1)
 
 	rpcDispatch = rpc.httpRPCDispatch(address = '0.0.0.0', port = 27272)
 	notice(desktopFactory, 'Started remote procedure call dispatcher on ' + str(rpcDispatch.address) + ', port ' + str(rpcDispatch.port))
 	rpcDispatch.addFunctions(('move',desktopFactory.move),
-							('position', desktopFactory.getPosition),
-							('jog', desktopFactory.jog),
-							('disableMotors', desktopFactory.xyzNode.disableMotorsRequest),
-							('loadFile', fileReader.loadFromURL),
-							('runFile', fileReader.runFile),
-							('setPosition', desktopFactory.setPosition))	#expose these functions on an http interface
+				('position', desktopFactory.getPosition),
+				('jog', desktopFactory.jog),
+				('disableMotors', desktopFactory.xyzNode.disableMotorsRequest),
+				('loadFile', fileReader.loadFromURL),
+				('runFile', fileReader.runFile),
+				('setPosition', desktopFactory.setPosition))	#expose these functions on an http interface
 	rpcDispatch.addOrigins('http://tq.mit.edu', 'http://127.0.0.1:8000')	#allow scripts from these sites to access the RPC interface
+	rpcDispatch.allowAllOrigins()
 	rpcDispatch.start()
