@@ -174,6 +174,10 @@ class move(object):
 			thisSegment = self.plannerQueue[-1]
 				
 			#choose the entry velocity for the segment.
+			#-> forwardPassExitStepRate: the exit velocity of the prior segment (as calculated by the forward pass)
+			#-> entryJunctionMaxStepRate: the max velocity at the junction, based solely on accelerations.
+			#-> segmentMaxStepRate:	the steady-state max speed of the segment, based on feedrate.
+			
 			if len(self.plannerQueue)>1:
 				priorSegment = self.plannerQueue[-2]
 				thisSegment.forwardPassEntryStepRate = min(priorSegment.forwardPassExitStepRate, thisSegment.entryJunctionMaxStepRate,
@@ -182,6 +186,7 @@ class move(object):
 				thisSegment.forwardPassEntryStepRate = min(thisSegment.entryJunctionMaxStepRate, thisSegment.segmentMaxStepRate)
 		
 		
+			#get the distance required to accelerate from the entry velocity to the requested segment speed
 			accelLength = self.distanceFromVelocities(finalVelocity = thisSegment.segmentMaxStepRate,
 												initialVelocity = thisSegment.forwardPassEntryStepRate,
 												acceleration = thisSegment.segmentAccelRate)
@@ -203,7 +208,7 @@ class move(object):
 				if segmentIndex > 0:
 					priorSegment = self.plannerQueue[-segmentIndex]
 					thisSegment.reversePassExitStepRate = min(priorSegment.reversePassEntryStepRate, priorSegment.forwardPassEntryStepRate)
-				else:
+				else:	#last segment
 					thisSegment.reversePassExitStepRate = thisSegment.exitJunctionMaxStepRate
 		
 				#number of steps to decelerate from the segment entry velocity to the segment exit velocity 

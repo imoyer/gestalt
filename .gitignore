@@ -1,0 +1,9 @@
+#compiled python files
+
+*.pyc
+
+#object files
+*.o
+*.ko
+*.obj
+*.elf

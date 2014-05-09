@@ -1,0 +1,14 @@
+go to tq.mit.edu/pcbmilling
+
+install gestalt (python setup.py install)
+
+install gsArduino library for arduino
+
+compile and download to arduino triStepShield.ino
+
+run virtual machine magicmill.py with 096-001a_boot.py in the same directory
+
+you should be able to now go to tq.mit.edu/pcbmilling and jog around the machine
+
+OR you can import magicmill as a python module and then call methods directly on it.
+
