@@ -1,0 +1,12 @@
+You can make a giganpan now by running gigapan.py
+
+x image capture
+x gigapan
+x   autotraverse
+  image blending
+focus
+camera calibration
+  write calibration target
+  do the calibration
+focal stacks
+
