@@ -14,6 +14,7 @@ from gestalt.machines import state
 from gestalt.utilities import notice
 from gestalt.publish import rpc	#remote procedure call dispatcher
 import time
+import io
 
 
 #------VIRTUAL MACHINE------
@@ -38,10 +39,10 @@ class virtualMachine(machines.virtualMachine):
 		self.position = state.coordinate(['mm','mm','mm', 'mm'])
 	
 	def initKinematics(self):
-		self.xAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(4), elements.invert.forward(False)])
-		self.yAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(4), elements.invert.forward(True)])
-		self.uAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(4), elements.invert.forward(True)])
-		self.vAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(4), elements.invert.forward(False)])
+		self.xAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(6.096), elements.invert.forward(True)])
+		self.yAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(6.096), elements.invert.forward(False)])
+		self.uAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(6.096), elements.invert.forward(True)])
+		self.vAxis = elements.elementChain.forward([elements.microstep.forward(4), elements.stepper.forward(1.8), elements.leadscrew.forward(6.096), elements.invert.forward(False)])
 
 		self.stageKinematics = kinematics.direct(4)	#direct drive on all axes
 	
@@ -79,20 +80,27 @@ if __name__ == '__main__':
 #	stages.uvNode.loadProgram('../../../086-005/086-005a.hex')
 	#stages.xyNode.setVelocityRequest(8)
 	#stages.uvNode.setVelocityRequest(8)
-	stages.xyuvNode.setVelocityRequest(8)	
+	stages.xyuvNode.setVelocityRequest(1)	
 	
-	f = open('airfoil.csv','r')
+	f = open('nadyafoil.csv','r')
 	circcoords = []
 	for line in f.readlines():
-		xy = line.split(' ')
+		xy = line.split(',')
 		coord = []
 		for num in xy:
 			try:
 				nr = float(num)
-				coord.append(nr*100)
+				coord.append(nr)
 			except:
 				pass
 		circcoords.append(coord)
+
+	#for coord in circcoords:
+	#	coord[1] = coord[1]-98.0
+	#	coord[3] = coord[3]-98.0
+	circcoords.append([0,0,0,0])
+
+	print circcoords
 
 	doublecoords = []
 	for coord in circcoords:
@@ -123,21 +131,84 @@ if __name__ == '__main__':
 	for coord in airfoil2:
 		airfoilmoves.append([coord[0], coord[1], coord[0], coord[1]])
 	airfoilmoves.append([0,0,0,0])
-	
-	#for move in airfoilmoves:
-	#	print move
 
-	
+#	valentines moves
+	f = open('happyvalentinesNadya4.csv', 'r')
+	moves = []
 
-	
-	stages.move([10,0,50,-20],0)	
-	time.sleep(1)
+	for line in f.readlines():
+		xyuv = line.split(',')
+		coor = []
+		for num in xyuv:
+			try:
+				coor.append(float(num))
+			except:
+				pass
+		moves.append(coor)
 
-	for coords in airfoilmoves:
+	moves = moves[2:] #first two wahtever
+
+	turn = []
+	i = 0
+	while i<len(moves):
+		first10moves = moves[i:i+9]
+		next10moves = moves[i+10:i+19]
+
+		for move in first10moves:
+			turn.append(move)
+		next10moves.reverse()
+
+		for move in next10moves:
+			turn.append(move)
+		i= i+19
+	#print turn	
+
+	square = []
+	square.append([80,0,80,0])
+	square.append([0,0,0,0])
+	square.append([0,80,0,80])
+	square.append([0,0,0,0])
+
+	fun =[]
+	fuile = open('VC.csv', 'r')
+
+	for line in fuile.readlines():
+		xyuv = line.split(',')
+		coor = []		
+		for num in xyuv:
+			try:
+				coor.append(float(num))
+			except:
+				pass
+		fun.append(coor)
+
+	fun = fun[2:] #first two whatever
+
+
+	double=[]
+	dfile=open('roof2.csv','r')
+	for line in dfile.readlines():
+		coords = line.split(',')
+		coor = []
+		for num in coords:
+			try:
+				coor.append(float(num))
+			except:
+				pass
+		double.append(coor)
+	
+	
+	back = []
+	back.append([0,0,0,0])
+	#back.append([-52,-42,-55,-130])
+	#back.append([-20,-30,-60,-60])	
+	#nadya idjit they are absolute
+
+	for coords in circcoords:
 		stages.move(coords, 0)
 		status = stages.xAxisNode.spinStatusRequest()
 		while status['stepsRemaining'] > 0:
-			time.sleep(0.01)
+			time.sleep(0.001)
 			status = stages.xAxisNode.spinStatusRequest()	
 	
 
