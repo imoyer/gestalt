@@ -3,7 +3,7 @@ gestalt
 
 A control system framework for personal fabrication.
 
-Stable 0.1 of gestalt
+version: 0.1 (stable)
 
 references
 ==========
