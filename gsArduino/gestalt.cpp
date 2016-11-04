@@ -167,7 +167,7 @@ typedef struct {  //http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewto
 
 // CRC TABLE
 // -this gets placed in program memory rather than RAM
-uint8_t crcTable[256] PROGMEM = {
+const uint8_t crcTable[256] PROGMEM = {
   0, 7, 14, 9, 28, 27, 18, 21, 56, 63, 54, 49, 36, 35, 42, 45, 112, 119, 
   126, 121, 108, 107, 98, 101, 72, 79, 70, 65, 84, 83, 90, 93, 224, 231, 
   238, 233, 252, 251, 242, 245, 216, 223, 214, 209, 196, 195, 202, 205, 
@@ -251,7 +251,7 @@ void setup(){
       UBRR0 = 12;  //8 = 115.2kbps, 12 = 76.8kbps @16MHz NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
     #endif      
   #else
-  UBRR0 = 12;  //8 = 115.2kbps, 12 = 76.8kbps @16MHz NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
+  UBRR0 = 25;  //8 = 115.2kbps, 12 = 76.8kbps, 25 = 38.4kbps @16MHz NOTE: tried 115200 without success from MacOSX, 76800 worked fine.
   #endif
 
   UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(0<<UDRIE0)|(1<<RXCIE0)|(0<<TXCIE0);  //enable transmitter and receiver, rx interrupts
