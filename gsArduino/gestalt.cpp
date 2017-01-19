@@ -520,6 +520,14 @@ void svcSetIPAddress(){
       }
     }
   }
+  //Button has been pressed
+  *IO_ledPORT |= IO_ledPin;   //turn off LED
+  while(!(*IO_buttonPIN & IO_buttonPin)){
+    //wait for button to be released
+  }
+  _delay_ms(100); //wait for button to debounce
+
+  //set address and reply
   networkAddress[0] = rxBuffer[payloadLocation];  //load new IP address
   networkAddress[1] = rxBuffer[payloadLocation+1];
   eeprom_update_byte((uint8_t*)persistentIPAddress0, networkAddress[0]);  //store IP address in eeprom
